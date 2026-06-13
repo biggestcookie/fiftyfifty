@@ -7,7 +7,9 @@
     "dev": "nuxt dev",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
-    "lint": "eslint .",
+    "lint": "bun run lint:fix && bun run lint:format",
+    "lint:fix": "eslint . --fix",
+    "lint:format": "prettier --write .",
     "typecheck": "nuxt typecheck",
     "test": "vitest",
     "test:watch": "vitest --watch",
@@ -32,9 +34,12 @@
   },
   "devDependencies": {
     "@nuxt/eslint": "^1.15.2",
+    "@types/bun": "^1.3.14",
     "@vitest/coverage-v8": "^4.1.8",
     "@vue/test-utils": "^2.4.11",
     "eslint": "^10.4.1",
+    "prettier": "^2.8.8",
+    "sass": "^1.72.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.8",
     "vue-tsc": "^3.3.3"
@@ -44,6 +49,5 @@
     "arrowParens": "always",
     "endOfLine": "lf",
     "trailingComma": "es5"
-  },
-  "packageManager": "pnpm@11.5.2"
+  }
 }
