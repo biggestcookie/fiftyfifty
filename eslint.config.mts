@@ -1,10 +1,14 @@
-// eslint.config.mts
-import withNuxt from "./.nuxt/eslint.config.mjs";
 import eslintConfigPrettier from "eslint-config-prettier";
+import { includeIgnoreFile } from "eslint/config";
+import { fileURLToPath } from "node:url";
+import withNuxt from "./.nuxt/eslint.config.mjs";
 
 export default withNuxt([
+  includeIgnoreFile(fileURLToPath(new URL(".gitignore", import.meta.url)), {
+    gitignoreResolution: true,
+  }),
   {
-    ignores: ["**/*.d.ts", "**/coverage", "**/dist", "**/node_modules"],
+    files: ["app/**/*.ts", "app/**/*.vue"],
   },
   {
     rules: {
