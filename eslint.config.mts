@@ -53,6 +53,7 @@ export default withNuxt([
           order: ["script", "template", "style"],
         },
       ],
+      "nuxt/nuxt-config-keys-order": "off",
       // "@typescript-eslint/no-unused-vars": [
       //   "error",
       //   {
