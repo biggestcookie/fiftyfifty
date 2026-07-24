@@ -10,7 +10,7 @@
     "postinstall": "nuxt prepare",
     "lint": "bun run lint:fix && bun run lint:format",
     "lint:fix": "eslint . --fix",
-    "lint:format": "prettier --loglevel warn --write app/**/*.{ts,vue,scss}",
+    "lint:format": "prettier --loglevel warn --no-error-on-unmatched-pattern --write \"app/**/*.{ts,js,tsx,jsx,vue,css,scss,md,json}\"",
     "typecheck": "nuxt typecheck",
     "test": "vitest",
     "test:watch": "vitest --watch",
