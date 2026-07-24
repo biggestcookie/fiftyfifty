@@ -23,6 +23,7 @@ useSeoMeta({
 
 <template>
   <UApp>
+    <VitePwaManifest />
     <UHeader>
       <template #left>
         <NuxtLink to="/">
