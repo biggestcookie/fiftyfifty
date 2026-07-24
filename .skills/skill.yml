@@ -1,0 +1,22 @@
+# Minimal repo skill manifest — intentionally lightweight
+name: "repo-skill"
+framework: "nuxt"
+packageManager: "bun"
+nodeVersion: ">=18"
+devScripts:
+  dev: "bun run dev"
+  build: "bun run build"
+  preview: "bun run preview"
+linters:
+  - "eslint"
+  - "prettier"
+testRunner: "vitest"
+ci: "github-actions"
+detectionHints:
+  - "nuxt.config"
+  - "package.json:bun"
+  - "bun.lockb"
+references:
+  nuxt-ui: "https://ui.nuxt.com"
+  nuxt-docs: "https://nuxt.com/docs"
+# Keep this file minimal — agents should rely on these explicit keys rather than heuristics where possible.

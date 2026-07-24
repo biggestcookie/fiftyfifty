@@ -4,6 +4,8 @@
 
 Use this template to get started with [Nuxt UI](https://ui.nuxt.com) quickly.
 
+Note: See [agents.md](/home/bigcookie/projects/fiftyfifty.worktrees/customize-repo-stack-awareness/agents.md) for a concise project stack summary and a machine-readable manifest at [.skills/skill.yml](/home/bigcookie/projects/fiftyfifty.worktrees/customize-repo-stack-awareness/.skills/skill.yml).
+
 - [Live demo](https://starter-template.nuxt.dev/)
 - [Documentation](https://ui.nuxt.com/docs/getting-started/installation/nuxt)
 
@@ -32,7 +34,7 @@ npm create nuxt@latest -- -t ui
 Make sure to install the dependencies:
 
 ```bash
-pnpm install
+bun install
 ```
 
 ## Development Server
@@ -40,7 +42,7 @@ pnpm install
 Start the development server on `http://localhost:3000`:
 
 ```bash
-pnpm dev
+bun run dev
 ```
 
 ## Production
@@ -48,13 +50,13 @@ pnpm dev
 Build the application for production:
 
 ```bash
-pnpm build
+bun run build
 ```
 
 Locally preview production build:
 
 ```bash
-pnpm preview
+bun run preview
 ```
 
 Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
