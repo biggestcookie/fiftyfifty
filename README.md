@@ -1,66 +1,43 @@
-# Nuxt Starter Template
+# FiftyFifty — Effortless check splitting
 
-[![Nuxt UI](https://img.shields.io/badge/Made%20with-Nuxt%20UI-00DC82?logo=nuxt&labelColor=020420)](https://ui.nuxt.com)
+FiftyFifty is a mobile-first, client-side Progressive Web App (PWA) that makes splitting checks quick and private. No accounts, no sign-ins, and no server-side tracking — just a fast, installable app that runs entirely in your browser.
 
-Use this template to get started with [Nuxt UI](https://ui.nuxt.com) quickly.
+Key benefits
 
-Note: See [agents.md](/home/bigcookie/projects/fiftyfifty.worktrees/customize-repo-stack-awareness/agents.md) for a concise project stack summary and a machine-readable manifest at [.skills/skill.yml](/home/bigcookie/projects/fiftyfifty.worktrees/customize-repo-stack-awareness/.skills/skill.yml).
+- Fast setup: Get a split in seconds with a touch-first interface.
+- Mobile-first: Designed for small screens and one-handed use.
+- Offline-capable: Works without a network after the initial load.
+- Privacy-first: All data stays on the device; nothing is sent to a server.
+- Installable: Add to the home screen for an app-like experience.
 
-- [Live demo](https://starter-template.nuxt.dev/)
-- [Documentation](https://ui.nuxt.com/docs/getting-started/installation/nuxt)
+Privacy & security
 
-<a href="https://starter-template.nuxt.dev/" target="_blank">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://ui.nuxt.com/assets/templates/nuxt/starter-dark.png">
-    <source media="(prefers-color-scheme: light)" srcset="https://ui.nuxt.com/assets/templates/nuxt/starter-light.png">
-    <img alt="Nuxt Starter Template" src="https://ui.nuxt.com/assets/templates/nuxt/starter-light.png" width="830" height="466">
-  </picture>
-</a>
+- Client-only architecture: calculations and storage are local (IndexedDB/localStorage). No backend or persisted cloud storage.
+- No telemetry or accounts: the app does not collect personal data.
+- Explicit sharing only: sharing uses the device's native share/copy features and requires user action.
 
-> The starter template for Vue is on https://github.com/nuxt-ui-templates/starter-vue.
+Install & offline
 
-## Quick Start
+- Includes a web manifest and service worker for installability and asset caching.
+- Core UI and previously created bills remain available offline after first load.
 
-```bash [Terminal]
-npm create nuxt@latest -- -t ui
-```
+Support & contribution
 
-## Deploy your own
+- Report bugs and request features via the project's GitHub repository — see issues and contribution guidelines in this repo's root.
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-name=starter&repository-url=https%3A%2F%2Fgithub.com%2Fnuxt-ui-templates%2Fstarter&demo-image=https%3A%2F%2Fui.nuxt.com%2Fassets%2Ftemplates%2Fnuxt%2Fstarter-dark.png&demo-url=https%3A%2F%2Fstarter-template.nuxt.dev%2F&demo-title=Nuxt%20Starter%20Template&demo-description=A%20minimal%20template%20to%20get%20started%20with%20Nuxt%20UI.)
+Technical notes
 
-## Setup
+- Framework: Nuxt (Nuxt UI starter template).
+- Package manager: bun. Node >=18 recommended.
+- Storage: IndexedDB (preferred) with localStorage for ephemeral UI state.
+- PWA: service worker for app shell caching and a web manifest for install behavior.
+- Scripts (see package.json): dev (bun run dev), build (bun run build), preview (bun run preview).
 
-Make sure to install the dependencies:
+Developer guidance
 
-```bash
-bun install
-```
+- This project is intentionally client-only. Avoid adding server-side telemetry or user-tracking unless the architecture and docs are updated accordingly.
+- Prefer IndexedDB for structured bill data and plan for migrations on schema changes.
 
-## Development Server
+More developer details
 
-Start the development server on `http://localhost:3000`:
-
-```bash
-bun run dev
-```
-
-## Production
-
-Build the application for production:
-
-```bash
-bun run build
-```
-
-Locally preview production build:
-
-```bash
-bun run preview
-```
-
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
-
-## Renovate integration
-
-Install [Renovate GitHub app](https://github.com/apps/renovate/installations/select_target) on your repository and you are good to go.
+See [agents.md](/home/bigcookie/projects/fiftyfifty/agents.md) for a concise developer-facing summary and pointers to key files.
