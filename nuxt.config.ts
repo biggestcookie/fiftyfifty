@@ -16,7 +16,7 @@ export default defineNuxtConfig({
     enabled: true,
   },
   app: {
-    baseURL: "/nuxt-template/",
+    baseURL: "/fiftyfifty/",
   },
   nitro: {
     preset: "github-pages",
@@ -70,18 +70,18 @@ export default defineNuxtConfig({
   pwa: {
     registerType: "autoUpdate",
 
-    scope: "/nuxt-template/",
-    base: "/nuxt-template/",
+    scope: "/fiftyfifty/",
+    base: "/fiftyfifty/",
 
     manifest: {
-      name: "Nuxt Template",
-      short_name: "Nuxt",
-      description: "A Nuxt PWA Demo",
+      name: "Fifty-fifty",
+      short_name: "5050",
+      description: "A check-splitting app",
       theme_color: "#000000",
       background_color: "#ffffff",
       display: "standalone",
       orientation: "portrait",
-      start_url: "/nuxt-template/",
+      start_url: "/fiftyfifty/",
       icons: [],
     },
 
