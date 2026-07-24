@@ -1,12 +1,12 @@
 # Minimal repo skill manifest — intentionally lightweight
 name: "repo-skill"
 framework: "nuxt"
-packageManager: "pnpm"
+packageManager: "bun"
 nodeVersion: ">=18"
 devScripts:
-  dev: "pnpm dev"
-  build: "pnpm build"
-  preview: "pnpm preview"
+  dev: "bun run dev"
+  build: "bun run build"
+  preview: "bun run preview"
 linters:
   - "eslint"
   - "prettier"
@@ -14,8 +14,8 @@ testRunner: "vitest"
 ci: "github-actions"
 detectionHints:
   - "nuxt.config"
-  - "package.json:pnpm"
-  - "pnpm-lock.yaml"
+  - "package.json:bun"
+  - "bun.lockb"
 references:
   nuxt-ui: "https://ui.nuxt.com"
   nuxt-docs: "https://nuxt.com/docs"

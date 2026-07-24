@@ -7,12 +7,12 @@ This file is the human-facing, canonical summary of the repository's stack, tool
 Project summary
 
 - Framework: Nuxt (Nuxt UI starter template)
-- Package manager: pnpm
+- Package manager: bun
 - Node: >=18 (recommendation; check engines in package.json)
 - Key scripts:
-  - dev: pnpm dev
-  - build: pnpm build
-  - preview: pnpm preview
+  - dev: bun run dev
+  - build: bun run build
+  - preview: bun run preview
 - CI: GitHub Actions (typical for this template)
 - Linters / formatters: ESLint, Prettier (as configured in the repo)
 - Test runner: (if present) vitest or similar
