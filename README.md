@@ -4,6 +4,8 @@
 
 Use this template to get started with [Nuxt UI](https://ui.nuxt.com) quickly.
 
+Note: See [agents.md](/home/bigcookie/projects/fiftyfifty.worktrees/customize-repo-stack-awareness/agents.md) for a concise project stack summary and a machine-readable manifest at [.skills/skill.yml](/home/bigcookie/projects/fiftyfifty.worktrees/customize-repo-stack-awareness/.skills/skill.yml).
+
 - [Live demo](https://starter-template.nuxt.dev/)
 - [Documentation](https://ui.nuxt.com/docs/getting-started/installation/nuxt)
 

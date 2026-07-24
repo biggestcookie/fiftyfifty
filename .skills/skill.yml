@@ -1,0 +1,22 @@
+# Minimal repo skill manifest — intentionally lightweight
+name: "repo-skill"
+framework: "nuxt"
+packageManager: "pnpm"
+nodeVersion: ">=18"
+devScripts:
+  dev: "pnpm dev"
+  build: "pnpm build"
+  preview: "pnpm preview"
+linters:
+  - "eslint"
+  - "prettier"
+testRunner: "vitest"
+ci: "github-actions"
+detectionHints:
+  - "nuxt.config"
+  - "package.json:pnpm"
+  - "pnpm-lock.yaml"
+references:
+  nuxt-ui: "https://ui.nuxt.com"
+  nuxt-docs: "https://nuxt.com/docs"
+# Keep this file minimal — agents should rely on these explicit keys rather than heuristics where possible.
