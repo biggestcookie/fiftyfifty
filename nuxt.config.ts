@@ -16,7 +16,10 @@ export default defineNuxtConfig({
     enabled: true,
   },
   app: {
-    baseURL: "./",
+    baseURL: "/nuxt-template/",
+  },
+  nitro: {
+    preset: "github-pages",
   },
   css: ["~/assets/css/main.css"],
   routeRules: {
@@ -63,5 +66,27 @@ export default defineNuxtConfig({
         },
       },
     ],
+  },
+  pwa: {
+    registerType: "autoUpdate",
+
+    scope: "/nuxt-template/",
+    base: "/nuxt-template/",
+
+    manifest: {
+      name: "Nuxt Template",
+      short_name: "Nuxt",
+      description: "A Nuxt PWA Demo",
+      theme_color: "#000000",
+      background_color: "#ffffff",
+      display: "standalone",
+      orientation: "portrait",
+      start_url: "/nuxt-template/",
+      icons: [],
+    },
+
+    workbox: {
+      globPatterns: ["**/*.{js,css,html,png,svg,ico}"],
+    },
   },
 });
