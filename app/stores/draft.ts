@@ -1,5 +1,11 @@
 import { defineStore } from "pinia";
-import { Step, TaxTipMode, type Draft, type Check, type Item } from "~/types/check";
+import {
+  Step,
+  TaxTipMode,
+  type Draft,
+  type Check,
+  type Item,
+} from "~/types/check";
 
 function emptyDraft(): Draft {
   return {

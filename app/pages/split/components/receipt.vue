@@ -4,20 +4,6 @@ import { Step, TaxTipMode } from "~/types/check";
 const draft = useDraftStore();
 const flow = useSplitFlow();
 
-const tax = computed<number | null>({
-  get: () => draft.draft?.tax ?? 0,
-  set: (value) => {
-    draft.setTax(value ?? 0);
-  },
-});
-
-const tip = computed<number | null>({
-  get: () => draft.draft?.tip ?? 0,
-  set: (value) => {
-    draft.setTip(value ?? 0);
-  },
-});
-
 const taxTipMode = computed<TaxTipMode>({
   get: () => draft.draft?.taxTipMode ?? TaxTipMode.Proportional,
   set: (value) => {
@@ -66,10 +52,6 @@ function addItem() {
   draft.addItem();
 }
 
-function removeItem(id: string) {
-  draft.removeItem(id);
-}
-
 function selectAll(itemId: string) {
   if (!draft.draft) return;
   if (allSelected(itemId)) {
@@ -98,7 +80,7 @@ function onFinalize() {
 
 <template>
   <div>
-    <UPageHero
+    <UPageHeader
       title="Divvy up the check"
       description="Assign each item to a guest."
     />
@@ -126,7 +108,7 @@ function onFinalize() {
             <UInput
               :model-value="item.label"
               placeholder="Item name"
-              class="w-full sm:flex-[2]"
+              class="w-full sm:flex-[3]"
               @update:model-value="updateLabel(item.id, $event as string)"
             />
             <UInputNumber
@@ -134,18 +116,16 @@ function onFinalize() {
               placeholder="0.00"
               :min="0"
               :step="0.01"
+              :increment="false"
+              :decrement="false"
+              :format-options="{
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              }"
               class="w-full sm:flex-1"
               @update:model-value="
                 updateAmount(item.id, $event as number | null)
               "
-            />
-            <UButton
-              label="Remove"
-              variant="ghost"
-              color="error"
-              size="sm"
-              class="min-h-[44px]"
-              @click="removeItem(item.id)"
             />
           </div>
 
@@ -163,9 +143,9 @@ function onFinalize() {
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <UCheckbox
-                v-for="guest in draft.draft.guests"
+                v-for="(guest, guestIndex) in draft.draft.guests"
                 :key="guest.id"
-                :label="guest.name ?? `Guest`"
+                :label="guestDisplayName(guest, guestIndex)"
                 :model-value="item.guestIds.includes(guest.id)"
                 class="min-h-[44px]"
                 @update:model-value="toggleGuest(item.id, guest.id)"
@@ -179,28 +159,6 @@ function onFinalize() {
               {{ item.guestIds.length }} of {{ draft.guestCount }} guests
             </p>
           </div>
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <UFormField label="Tax">
-            <UInputNumber
-              v-model="tax"
-              :min="0"
-              :step="0.01"
-              placeholder="0.00"
-              class="w-full"
-            />
-          </UFormField>
-
-          <UFormField label="Tip">
-            <UInputNumber
-              v-model="tip"
-              :min="0"
-              :step="0.01"
-              placeholder="0.00"
-              class="w-full"
-            />
-          </UFormField>
         </div>
 
         <UFormField label="Tax/tip split">

@@ -23,7 +23,7 @@ function onContinue() {
 
 <template>
   <div>
-    <UPageHero
+    <UPageHeader
       title="Choose guests"
       description="Add the people splitting this check."
     />
@@ -34,6 +34,8 @@ function onContinue() {
           <UInputNumber
             v-model="guestCount"
             :min="0"
+            :increment="true"
+            :decrement="true"
             placeholder="Number of guests"
             class="w-full"
           />
@@ -50,7 +52,7 @@ function onContinue() {
           >
             <UInput
               :model-value="guest.name ?? ''"
-              :placeholder="`Guest ${index + 1}`"
+              :placeholder="`Guest ${String.fromCharCode(65 + index)}`"
               class="w-full"
               @update:model-value="updateGuestName(guest.id, $event as string)"
             />

@@ -29,16 +29,15 @@ onMounted(async () => {
 <template>
   <UApp>
     <VitePwaManifest />
-    <UHeader>
-      <template #left>
-        <NuxtLink to="/" class="text-lg font-semibold">FiftyFifty</NuxtLink>
-      </template>
-    </UHeader>
+    <NuxtLink
+      to="/"
+      class="fixed top-4 left-4 z-50 rounded-md bg-white/80 px-2 py-1 text-lg font-semibold tracking-tight text-neutral-900 backdrop-blur-sm transition-opacity hover:opacity-70 dark:bg-neutral-900/80 dark:text-white"
+    >
+      50/50
+    </NuxtLink>
 
     <UMain>
       <NuxtPage />
     </UMain>
-
-    <UFooter />
   </UApp>
 </template>

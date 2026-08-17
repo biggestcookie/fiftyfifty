@@ -16,10 +16,10 @@ onMounted(() => {
 </script>
 
 <template>
-  <UContainer class="py-8">
+  <UContainer class="mt-12 py-8 max-w-md mx-auto">
     <Breadcrumb :current="draft.draft?.currentStep ?? Step.Guests" />
 
-    <div class="mt-6">
+    <div>
       <Guests v-if="draft.draft?.currentStep === Step.Guests" />
       <Items v-else-if="draft.draft?.currentStep === Step.Items" />
       <Receipt v-else-if="draft.draft?.currentStep === Step.Receipt" />
