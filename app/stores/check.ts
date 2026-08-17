@@ -28,6 +28,15 @@ export const useCheckStore = defineStore("checks", {
         this.checks.push(check);
       }
     },
+    async publishExisting(id: string, check: Check) {
+      await putCheck(check);
+      const idx = this.checks.findIndex((c) => c.id === id);
+      if (idx >= 0) {
+        this.checks[idx] = check;
+      } else {
+        this.checks.push(check);
+      }
+    },
     async remove(id: string) {
       await deleteCheck(id);
       this.checks = this.checks.filter((c) => c.id !== id);

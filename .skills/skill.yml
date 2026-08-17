@@ -10,7 +10,6 @@ devScripts:
 linters:
   - "eslint"
   - "prettier"
-testRunner: "vitest"
 ci: "github-actions"
 detectionHints:
   - "nuxt.config"

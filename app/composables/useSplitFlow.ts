@@ -1,4 +1,4 @@
-import { Step } from "~/types/check";
+import { Step, type Check } from "~/types/check";
 
 export function useSplitFlow() {
   const draft = useDraftStore();
@@ -14,22 +14,22 @@ export function useSplitFlow() {
     if (!draft.draft) await draft.initBlank();
     draft.setStep(step);
     await draft.persist();
-    await router.push(`/split/${step}`);
   }
 
   async function resume() {
     if (!draft.loaded) await draft.load();
-    if (!draft.draft) return false;
-    const step = draft.draft.currentStep;
-    await router.push(`/split/${step}`);
-    return true;
+    return draft.draft !== null;
   }
 
   async function gotoStep(step: Step) {
     if (!draft.draft) return;
     draft.setStep(step);
     await draft.persist();
-    await router.push(`/split/${step}`);
+  }
+
+  async function edit(check: Check) {
+    if (!draft.loaded) await draft.load();
+    await draft.startEditing(check);
   }
 
   async function finalize() {
@@ -37,5 +37,5 @@ export function useSplitFlow() {
     if (check) await router.push(`/checks/${check.id}`);
   }
 
-  return { ensureDraft, start, resume, gotoStep, finalize };
+  return { ensureDraft, start, resume, gotoStep, finalize, edit };
 }

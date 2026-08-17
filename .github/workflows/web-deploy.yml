@@ -51,6 +51,8 @@ jobs:
 
       - name: Build site
         run: bun run generate
+        env:
+          NUXT_BASE_URL: "/fiftyfifty/"
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v5

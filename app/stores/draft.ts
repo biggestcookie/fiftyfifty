@@ -21,6 +21,7 @@ export const useDraftStore = defineStore("draft", {
   state: () => ({
     draft: null as Draft | null,
     loaded: false,
+    editingCheckId: null as string | null,
   }),
   getters: {
     isActive: (state) => state.draft !== null,
@@ -31,19 +32,35 @@ export const useDraftStore = defineStore("draft", {
     async load() {
       this.draft = (await getDraft()) ?? null;
       this.loaded = true;
+      this.editingCheckId = null;
     },
     async initBlank() {
+      this.editingCheckId = null;
       this.draft = emptyDraft();
       await this.persist();
     },
     async clear() {
       this.draft = null;
+      this.editingCheckId = null;
       await deleteDraft();
     },
     async persist() {
       if (!this.draft) return;
       this.draft.updatedAt = Date.now();
       await putDraft(this.draft);
+    },
+
+    async startEditing(check: Check) {
+      this.draft = {
+        guests: check.guests.map((g) => ({ ...g })),
+        items: check.items.map((i) => ({ ...i, guestIds: [...i.guestIds] })),
+        tax: check.tax,
+        tip: check.tip,
+        currentStep: Step.Receipt, // resume to assignment; guests/items already filled
+        updatedAt: Date.now(),
+      };
+      this.editingCheckId = check.id;
+      await this.persist();
     },
 
     setStep(step: Step) {
@@ -58,7 +75,8 @@ export const useDraftStore = defineStore("draft", {
         guests.push({ id: uid() });
       }
       while (guests.length > n) {
-        guests.pop();
+        // Drop the most-recently-added guests first (push appends, so last entries are newest)
+        guests.splice(n);
       }
     },
     setGuestName(id: string, name: string) {
@@ -122,20 +140,36 @@ export const useDraftStore = defineStore("draft", {
         }
       }
 
-      const check: Check = {
-        id: uid(),
-        createdAt: Date.now(),
-        guests: d.guests,
-        items: d.items,
-        tax: d.tax,
-        tip: d.tip,
-        currentStep: Step.Receipt,
-        updatedAt: Date.now(),
-        totals,
-      };
-
       const checkStore = useCheckStore();
-      await checkStore.add(check);
+      let check: Check;
+      if (this.editingCheckId) {
+        const existing = await checkStore.loadById(this.editingCheckId);
+        check = {
+          id: this.editingCheckId,
+          createdAt: existing?.createdAt ?? Date.now(),
+          guests: d.guests,
+          items: d.items,
+          tax: d.tax,
+          tip: d.tip,
+          currentStep: Step.Receipt,
+          updatedAt: Date.now(),
+          totals,
+        };
+        await checkStore.publishExisting(this.editingCheckId, check);
+      } else {
+        check = {
+          id: uid(),
+          createdAt: Date.now(),
+          guests: d.guests,
+          items: d.items,
+          tax: d.tax,
+          tip: d.tip,
+          currentStep: Step.Receipt,
+          updatedAt: Date.now(),
+          totals,
+        };
+        await checkStore.add(check);
+      }
       await this.clear();
       return check;
     },

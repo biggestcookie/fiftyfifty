@@ -1,5 +1,10 @@
 import { openDB, type IDBPDatabase } from "idb";
+import { toRaw } from "vue";
 import type { Draft, Check } from "~/types/check";
+
+function clone<T>(value: T): T {
+  return structuredClone(toRaw(value));
+}
 
 const DB_NAME = "fiftyfifty";
 const DB_VERSION = 1;
@@ -35,7 +40,7 @@ export async function getCheck(id: string): Promise<Check | undefined> {
 
 export async function putCheck(check: Check): Promise<void> {
   const db = await getDb();
-  await db.put("checks", check);
+  await db.put("checks", clone(check));
 }
 
 export async function deleteCheck(id: string): Promise<void> {
@@ -50,7 +55,7 @@ export async function getDraft(): Promise<Draft | undefined> {
 
 export async function putDraft(draft: Draft): Promise<void> {
   const db = await getDb();
-  await db.put("drafts", draft, DRAFT_KEY);
+  await db.put("drafts", clone(draft), DRAFT_KEY);
 }
 
 export async function deleteDraft(): Promise<void> {

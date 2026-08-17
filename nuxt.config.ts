@@ -1,11 +1,12 @@
 import { defineNuxtConfig } from "nuxt/config";
 
+const DEFAULT_BASE_URL = "/";
+
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   modules: [
     "@nuxt/eslint",
     "@nuxt/ui",
-    "@nuxt/test-utils",
     "@nuxtjs/device",
     "@nuxtjs/google-fonts",
     "@pinia/nuxt",
@@ -16,7 +17,7 @@ export default defineNuxtConfig({
     enabled: true,
   },
   app: {
-    baseURL: "/fiftyfifty/",
+    baseURL: process.env.NUXT_BASE_URL ?? DEFAULT_BASE_URL,
   },
   nitro: {
     preset: "github-pages",
@@ -28,7 +29,7 @@ export default defineNuxtConfig({
   compatibilityDate: "2025-01-15",
   typescript: {
     tsConfig: {
-      include: ["eslint.config.mts", "test/**/*.ts"],
+      include: ["eslint.config.mts"],
     },
   },
   eslint: {
@@ -70,8 +71,8 @@ export default defineNuxtConfig({
   pwa: {
     registerType: "autoUpdate",
 
-    scope: "/fiftyfifty/",
-    base: "/fiftyfifty/",
+    scope: process.env.NUXT_BASE_URL ?? DEFAULT_BASE_URL,
+    base: process.env.NUXT_BASE_URL ?? DEFAULT_BASE_URL,
 
     manifest: {
       name: "Fifty-fifty",
@@ -81,7 +82,7 @@ export default defineNuxtConfig({
       background_color: "#ffffff",
       display: "standalone",
       orientation: "portrait",
-      start_url: "/fiftyfifty/",
+      start_url: process.env.NUXT_BASE_URL ?? DEFAULT_BASE_URL,
       icons: [],
     },
 
