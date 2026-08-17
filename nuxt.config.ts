@@ -73,19 +73,52 @@ export default defineNuxtConfig({
     base: process.env.NUXT_BASE_URL ?? DEFAULT_BASE_URL,
 
     manifest: {
-      name: "Fifty-fifty",
-      short_name: "5050",
-      description: "A check-splitting app",
-      theme_color: "#000000",
+      name: "FiftyFifty",
+      short_name: "FiftyFifty",
+      description:
+        "Quickly split bills with friends. No accounts, no servers, fully private.",
+      theme_color: "#00c16a",
       background_color: "#ffffff",
       display: "standalone",
       orientation: "portrait",
       start_url: process.env.NUXT_BASE_URL ?? DEFAULT_BASE_URL,
-      icons: [],
+      icons: [
+        {
+          src: "/icons/icon-192.png",
+          sizes: "192x192",
+          type: "image/png",
+          purpose: "any",
+        },
+        {
+          src: "/icons/icon-512.png",
+          sizes: "512x512",
+          type: "image/png",
+          purpose: "any",
+        },
+        {
+          src: "/icons/icon-512.png",
+          sizes: "512x512",
+          type: "image/png",
+          purpose: "maskable",
+        },
+      ],
     },
 
     workbox: {
-      globPatterns: ["**/*.{js,css,html,png,svg,ico}"],
+      navigateFallback: "200.html",
+      globPatterns: [
+        "**/*.{js,mjs,css,html,png,svg,ico,woff,woff2,json}",
+      ],
+      runtimeCaching: [
+        {
+          urlPattern: ({ request }) => request.mode === "navigate",
+          handler: "NetworkFirst",
+          options: {
+            cacheName: "pages",
+            networkTimeoutSeconds: 3,
+          },
+        },
+      ],
     },
   },
 });
