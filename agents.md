@@ -34,7 +34,7 @@ A minimal manifest lives at .skills/skill.yml with the essential keys agents sho
 
 # Authoritative references
 
-- Nuxt UI: https://ui.nuxt.com
+- Nuxt UI: https://ui.nuxt.com/docs/components
 - Nuxt docs: https://nuxt.com/docs
 
 ## Key files and locations
