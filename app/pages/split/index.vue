@@ -8,15 +8,9 @@ import { Step } from "~/types/check";
 const draft = useDraftStore();
 const flow = useSplitFlow();
 
-const validSteps: Step[] = [Step.Guests, Step.Items, Step.Receipt];
-
-onMounted(async () => {
-  if (!draft.loaded) await draft.load();
-
+onMounted(() => {
   if (!draft.isActive) {
-    await flow.start();
-  } else if (!validSteps.includes(draft.draft?.currentStep as Step)) {
-    await flow.start();
+    flow.start();
   }
 });
 </script>

@@ -6,26 +6,23 @@ const flow = useSplitFlow();
 
 const guestCount = computed<number | null>({
   get: () => draft.guestCount,
-  set: async (value) => {
+  set: (value) => {
     if (!draft.draft) return;
     draft.setGuestCount(value ?? 0);
-    await draft.persist();
   },
 });
 
-async function updateGuestName(id: string, value: string) {
+function updateGuestName(id: string, value: string) {
   draft.setGuestName(id, value);
-  await draft.persist();
 }
 
-async function onContinue() {
-  await draft.persist();
-  await flow.gotoStep(Step.Items);
+function onContinue() {
+  flow.gotoStep(Step.Items);
 }
 </script>
 
 <template>
-  <UContainer>
+  <div>
     <UPageHero
       title="Choose guests"
       description="Add the people splitting this check."
@@ -69,5 +66,5 @@ async function onContinue() {
         />
       </div>
     </UCard>
-  </UContainer>
+  </div>
 </template>

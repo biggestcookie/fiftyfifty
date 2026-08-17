@@ -1,24 +1,42 @@
 <script setup lang="ts">
-import { Step } from "~/types/check";
+import { Step, TaxTipMode } from "~/types/check";
 
 const draft = useDraftStore();
 const flow = useSplitFlow();
 
 const tax = computed<number | null>({
   get: () => draft.draft?.tax ?? 0,
-  set: async (value) => {
+  set: (value) => {
     draft.setTax(value ?? 0);
-    await draft.persist();
   },
 });
 
 const tip = computed<number | null>({
   get: () => draft.draft?.tip ?? 0,
-  set: async (value) => {
+  set: (value) => {
     draft.setTip(value ?? 0);
-    await draft.persist();
   },
 });
+
+const taxTipMode = computed<TaxTipMode>({
+  get: () => draft.draft?.taxTipMode ?? TaxTipMode.Proportional,
+  set: (value) => {
+    draft.setTaxTipMode(value);
+  },
+});
+
+const taxTipModeItems = [
+  {
+    label: "Proportional",
+    value: TaxTipMode.Proportional,
+    description: "Split tax/tip based on each guest's share of items",
+  },
+  {
+    label: "Equal",
+    value: TaxTipMode.Equal,
+    description: "Split tax/tip evenly across all guests",
+  },
+];
 
 const canFinalize = computed(() => {
   if (!draft.draft) return false;
@@ -36,24 +54,20 @@ function allSelected(itemId: string): boolean {
   return item.guestIds.length === draft.guestCount;
 }
 
-async function updateLabel(id: string, value: string) {
+function updateLabel(id: string, value: string) {
   draft.updateItem(id, { label: value });
-  await draft.persist();
 }
 
-async function updateAmount(id: string, value: number | null) {
+function updateAmount(id: string, value: number | null) {
   draft.updateItem(id, { amount: value ?? 0 });
-  await draft.persist();
 }
 
-async function addItem() {
+function addItem() {
   draft.addItem();
-  await draft.persist();
 }
 
-async function removeItem(id: string) {
+function removeItem(id: string) {
   draft.removeItem(id);
-  await draft.persist();
 }
 
 function selectAll(itemId: string) {
@@ -66,26 +80,24 @@ function selectAll(itemId: string) {
       draft.draft.guests.map((g) => g.id)
     );
   }
-  draft.persist();
 }
 
-async function toggleGuest(itemId: string, guestId: string) {
+function toggleGuest(itemId: string, guestId: string) {
   draft.toggleItemGuest(itemId, guestId);
-  await draft.persist();
 }
 
-async function onBack() {
-  await flow.gotoStep(Step.Items);
+function onBack() {
+  flow.gotoStep(Step.Items);
 }
 
-async function onFinalize() {
+function onFinalize() {
   if (!canFinalize.value) return;
-  await flow.finalize();
+  flow.finalize();
 }
 </script>
 
 <template>
-  <UContainer>
+  <div>
     <UPageHero
       title="Divvy up the check"
       description="Assign each item to a guest."
@@ -169,32 +181,32 @@ async function onFinalize() {
           </div>
         </div>
 
-        <UButton label="Add item" variant="soft" block @click="addItem" />
-      </div>
-    </UCard>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <UFormField label="Tax">
+            <UInputNumber
+              v-model="tax"
+              :min="0"
+              :step="0.01"
+              placeholder="0.00"
+              class="w-full"
+            />
+          </UFormField>
 
-    <UCard class="mt-6">
-      <template #header>
-        <h2 class="text-lg font-semibold">Extras</h2>
-      </template>
+          <UFormField label="Tip">
+            <UInputNumber
+              v-model="tip"
+              :min="0"
+              :step="0.01"
+              placeholder="0.00"
+              class="w-full"
+            />
+          </UFormField>
+        </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <UFormField label="Tax">
-          <UInputNumber
-            v-model="tax"
-            :min="0"
-            :step="0.01"
-            placeholder="0.00"
-            class="w-full"
-          />
-        </UFormField>
-
-        <UFormField label="Tip">
-          <UInputNumber
-            v-model="tip"
-            :min="0"
-            :step="0.01"
-            placeholder="0.00"
+        <UFormField label="Tax/tip split">
+          <URadioGroup
+            v-model="taxTipMode"
+            :items="taxTipModeItems"
             class="w-full"
           />
         </UFormField>
@@ -219,5 +231,5 @@ async function onFinalize() {
         @click="onFinalize"
       />
     </div>
-  </UContainer>
+  </div>
 </template>

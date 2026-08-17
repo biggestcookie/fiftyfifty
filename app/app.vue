@@ -20,10 +20,9 @@ useSeoMeta({
 });
 
 const checkStore = useCheckStore();
-const draftStore = useDraftStore();
 
 onMounted(async () => {
-  await Promise.all([checkStore.loadAll(), draftStore.load()]);
+  await checkStore.loadAll();
 });
 </script>
 

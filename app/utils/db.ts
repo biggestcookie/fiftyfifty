@@ -1,14 +1,12 @@
 import { openDB, type IDBPDatabase } from "idb";
-import { toRaw } from "vue";
-import type { Draft, Check } from "~/types/check";
+import type { Check } from "~/types/check";
 
 function clone<T>(value: T): T {
-  return structuredClone(toRaw(value));
+  return JSON.parse(JSON.stringify(value)) as T;
 }
 
 const DB_NAME = "fiftyfifty";
 const DB_VERSION = 1;
-const DRAFT_KEY = "current";
 
 let dbPromise: Promise<IDBPDatabase> | null = null;
 
@@ -18,9 +16,6 @@ export function getDb(): Promise<IDBPDatabase> {
       upgrade(db) {
         if (!db.objectStoreNames.contains("checks")) {
           db.createObjectStore("checks", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("drafts")) {
-          db.createObjectStore("drafts");
         }
       },
     });
@@ -46,19 +41,4 @@ export async function putCheck(check: Check): Promise<void> {
 export async function deleteCheck(id: string): Promise<void> {
   const db = await getDb();
   await db.delete("checks", id);
-}
-
-export async function getDraft(): Promise<Draft | undefined> {
-  const db = await getDb();
-  return db.get("drafts", DRAFT_KEY) as Promise<Draft | undefined>;
-}
-
-export async function putDraft(draft: Draft): Promise<void> {
-  const db = await getDb();
-  await db.put("drafts", clone(draft), DRAFT_KEY);
-}
-
-export async function deleteDraft(): Promise<void> {
-  const db = await getDb();
-  await db.delete("drafts", DRAFT_KEY);
 }

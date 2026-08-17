@@ -5,12 +5,10 @@ import { getAllChecks, getCheck, putCheck, deleteCheck } from "~/utils/db";
 export const useCheckStore = defineStore("checks", {
   state: () => ({
     checks: [] as Check[],
-    loaded: false,
   }),
   actions: {
     async loadAll() {
       this.checks = await getAllChecks();
-      this.loaded = true;
     },
     async loadById(id: string): Promise<Check | undefined> {
       const check = await getCheck(id);
@@ -24,15 +22,6 @@ export const useCheckStore = defineStore("checks", {
       const existing = this.checks.findIndex((c) => c.id === check.id);
       if (existing >= 0) {
         this.checks[existing] = check;
-      } else {
-        this.checks.push(check);
-      }
-    },
-    async publishExisting(id: string, check: Check) {
-      await putCheck(check);
-      const idx = this.checks.findIndex((c) => c.id === id);
-      if (idx >= 0) {
-        this.checks[idx] = check;
       } else {
         this.checks.push(check);
       }
