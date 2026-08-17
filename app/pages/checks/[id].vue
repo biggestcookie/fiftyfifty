@@ -1,3 +1,8 @@
+<script setup lang="ts">
+const route = useRoute();
+const id = computed(() => route.params.id);
+</script>
+
 <template>
   <UContainer>
     <UPageHero
@@ -6,13 +11,3 @@
     />
   </UContainer>
 </template>
-
-<script setup>
-const route = useRoute();
-const id = computed(() => route.params.id);
-
-useSeoMeta({
-  title: () => `Check ${id.value} — FiftyFifty`,
-  description: "Finalized check summary and per-guest amounts.",
-});
-</script>

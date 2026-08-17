@@ -1,3 +1,5 @@
+<script setup lang="ts"></script>
+
 <template>
   <UContainer>
     <UPageHero
@@ -6,10 +8,3 @@
     />
   </UContainer>
 </template>
-
-<script setup>
-useSeoMeta({
-  title: "Guests — FiftyFifty",
-  description: "Choose guests for this check.",
-});
-</script>

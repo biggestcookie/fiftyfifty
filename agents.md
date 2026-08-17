@@ -31,6 +31,9 @@ A minimal manifest lives at .skills/skill.yml with the essential keys agents sho
 - Preserve privacy guarantees: avoid adding analytics, telemetry, or server-side storage unless the architecture and docs are updated.
 - Prefer small, surgical pull requests focused on one change.
 - Plan for data migrations when changing storage schemas.
+- All Vue components and pages must use `<script setup lang="ts">`.
+- Block order in every `.vue` file must be `<script setup>`, then `<template>`, then `<style>`. No other order is accepted.
+- Do not use nuxt hook `useSeoMeta` when creating new pages.
 
 # Authoritative references
 

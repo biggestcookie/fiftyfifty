@@ -28,6 +28,7 @@
     "@pinia/nuxt": "0.11.3",
     "@vite-pwa/nuxt": "1.1.1",
     "@vueuse/nuxt": "14.3.0",
+    "idb": "^8.0.3",
     "nuxt": "^4.4.8",
     "pinia": "^3.0.4",
     "tailwindcss": "^4.3.0",

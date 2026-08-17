@@ -1,43 +1,67 @@
-# FiftyFifty — Effortless check splitting
+# FiftyFifty
 
-FiftyFifty is a mobile-first, client-side Progressive Web App (PWA) that makes splitting checks quick and private. No accounts, no sign-ins, and no server-side tracking — just a fast, installable app that runs entirely in your browser.
+A no-hassle, streamlined check-splitting calculator packaged as a client-only PWA. Mobile-first, offline-capable, installable.
+No marketing fluff. Nothing to sell.
 
-Key benefits
+## Features
 
-- Fast setup: Get a split in seconds with a touch-first interface.
-- Mobile-first: Designed for small screens and one-handed use.
-- Offline-capable: Works without a network after the initial load.
-- Privacy-first: All data stays on the device; nothing is sent to a server.
-- Installable: Add to the home screen for an app-like experience.
+- Client-only. All calculations and storage stay on the device. No backend, no cloud sync.
+- No accounts, no telemetry, no tracking.
+- Sharing is explicit: native share/copy only, requires user action.
+- Storage: IndexedDB for structured check data, localStorage for ephemeral UI state.
 
-Privacy & security
+## Technical notes
 
-- Client-only architecture: calculations and storage are local (IndexedDB/localStorage). No backend or persisted cloud storage.
-- No telemetry or accounts: the app does not collect personal data.
-- Explicit sharing only: sharing uses the device's native share/copy features and requires user action.
+- Intentionally client-only. Do not add server-side telemetry or tracking.
+- Prefer IndexedDB for structured check data. Plan migrations on schema changes.
+- See [agents.md](/home/bigcookie/projects/fiftyfifty/agents.md) for developer-facing conventions.
 
-Install & offline
+### Stack
 
-- Includes a web manifest and service worker for installability and asset caching.
-- Core UI and previously created bills remain available offline after first load.
-
-Support & contribution
-
-- Report bugs and request features via the project's GitHub repository — see issues and contribution guidelines in this repo's root.
-
-Technical notes
-
-- Framework: Nuxt (Nuxt UI starter template).
+- Framework: Vue + Nuxt (Nuxt UI).
 - Package manager: bun. Node >=18 recommended.
+- Scripts: dev (`bun run dev`), build (`bun run build`), preview (`bun run preview`).
 - Storage: IndexedDB (preferred) with localStorage for ephemeral UI state.
-- PWA: service worker for app shell caching and a web manifest for install behavior.
-- Scripts (see package.json): dev (bun run dev), build (bun run build), preview (bun run preview).
+- PWA: service worker for app shell caching, web manifest for install behavior.
 
-Developer guidance
+### Install & offline
 
-- This project is intentionally client-only. Avoid adding server-side telemetry or user-tracking unless the architecture and docs are updated accordingly.
-- Prefer IndexedDB for structured bill data and plan for migrations on schema changes.
+- Web manifest + service worker for installability and asset caching.
+- App shell and previously created checks available offline after first load.
 
-More developer details
+## Pages
 
-See [agents.md](/home/bigcookie/projects/fiftyfifty/agents.md) for a concise developer-facing summary and pointers to key files.
+### Homepage (`/`)
+
+- Small hero with description.
+- Primary button: create new check.
+- Recent checks list below.
+
+### Split flow (`/split/`)
+
+Three-step subflow for a new check.
+
+**Step 1 — Guests (`/split/guests`)**
+
+- Enter number of guests (primary input).
+- Optionally label each guest.
+
+**Step 2 — Check (`/split/items`)**
+
+- Enter line items.
+- Optional button at top: upload receipt to autofill items.
+- Enter tax and tip at the bottom.
+
+**Step 3 — Assign (`/split/receipt`)**
+
+- Each item has a checkbox per guest for who is splitting it.
+- Quick "all" button per item to select all guests.
+
+### Check viewer (`/checks/[id]`)
+
+Hotlinkable final view of a saved check.
+
+- Top: per-guest totals (who owes what).
+- Each guest is a clickable box that expands into a breakdown showing:
+  - Items that person is on.
+  - Their share of tax and tip.
