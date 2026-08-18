@@ -79,7 +79,7 @@ export default defineNuxtConfig({
       background_color: "#ffffff",
       display: "standalone",
       orientation: "portrait",
-      start_url: process.env.NUXT_BASE_URL ?? DEFAULT_BASE_URL,
+      start_url: "/",
       icons: [
         {
           src: "/icons/icon-192.png",
