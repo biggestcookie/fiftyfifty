@@ -32,12 +32,12 @@ onMounted(async () => {
 <template>
   <UApp>
     <VitePwaManifest />
-    <NuxtLink
-      to="/"
-      class="fixed top-4 left-4 z-50 rounded-md bg-white/80 px-2 py-1 text-lg font-semibold tracking-tight text-neutral-900 backdrop-blur-sm transition-opacity hover:opacity-70 dark:bg-neutral-900/80 dark:text-white"
-    >
-      50/50
-    </NuxtLink>
+
+    <UHeader title="50/50" to="/" :toggle="false" :ui="{ root: 'static' }">
+      <template #right>
+        <ColorModeSelect />
+      </template>
+    </UHeader>
 
     <UMain>
       <NuxtPage />
