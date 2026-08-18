@@ -16,7 +16,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <UContainer class="mt-12 py-8 max-w-md mx-auto">
+  <UContainer class="py-8 max-w-md mx-auto">
     <Breadcrumb :current="draft.draft?.currentStep ?? Step.Guests" />
 
     <div>

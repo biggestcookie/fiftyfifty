@@ -1,4 +1,4 @@
-# FiftyFifty
+# [FiftyFifty](https://splitfiftyfifty.netlify.app)
 
 A no-hassle, streamlined check-splitting calculator packaged as a client-only PWA. Mobile-first, offline-capable, installable.
 No marketing fluff. Nothing to sell.

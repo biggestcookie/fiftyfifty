@@ -1,7 +1,5 @@
 import { defineNuxtConfig } from "nuxt/config";
 
-const DEFAULT_BASE_URL = "/";
-
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   ssr: false,
@@ -18,10 +16,10 @@ export default defineNuxtConfig({
     enabled: true,
   },
   app: {
-    baseURL: process.env.NUXT_BASE_URL ?? DEFAULT_BASE_URL,
+    baseURL: "/",
   },
   nitro: {
-    preset: "github-pages",
+    preset: "netlify",
   },
   css: ["~/assets/css/main.css"],
   compatibilityDate: "2025-01-15",
@@ -69,8 +67,8 @@ export default defineNuxtConfig({
   pwa: {
     registerType: "autoUpdate",
 
-    scope: process.env.NUXT_BASE_URL ?? DEFAULT_BASE_URL,
-    base: process.env.NUXT_BASE_URL ?? DEFAULT_BASE_URL,
+    scope: "/",
+    base: "/",
 
     manifest: {
       name: "FiftyFifty",
@@ -106,9 +104,7 @@ export default defineNuxtConfig({
 
     workbox: {
       navigateFallback: "200.html",
-      globPatterns: [
-        "**/*.{js,mjs,css,html,png,svg,ico,woff,woff2,json}",
-      ],
+      globPatterns: ["**/*.{js,mjs,css,html,png,svg,ico,woff,woff2,json}"],
       runtimeCaching: [
         {
           urlPattern: ({ request }) => request.mode === "navigate",
