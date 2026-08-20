@@ -33,6 +33,14 @@ const canFinalize = computed(() => {
   );
 });
 
+const itemsSubtotal = computed(() =>
+  (draft.draft?.items ?? []).reduce((sum, item) => sum + item.amount, 0)
+);
+
+const runningTotal = computed(
+  () => itemsSubtotal.value + (draft.draft?.tax ?? 0) + (draft.draft?.tip ?? 0)
+);
+
 function allSelected(itemId: string): boolean {
   if (!draft.draft) return false;
   const item = draft.draft.items.find((i) => i.id === itemId);
@@ -156,6 +164,18 @@ function onFinalize() {
           />
         </UFormField>
       </div>
+
+      <template #footer>
+        <div class="flex justify-end">
+          <UBadge
+            :label="`Total: ${formatCurrency(runningTotal)}`"
+            color="primary"
+            variant="solid"
+            size="lg"
+            class="text-base"
+          />
+        </div>
+      </template>
     </UCard>
 
     <div class="mt-6 flex flex-col sm:flex-row gap-3">

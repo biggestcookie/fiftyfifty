@@ -50,6 +50,14 @@ function removeItem(id: string) {
   draft.removeItem(id);
 }
 
+const itemsSubtotal = computed(() =>
+  items.value.reduce((sum, item) => sum + item.amount, 0)
+);
+
+const runningTotal = computed(
+  () => itemsSubtotal.value + (draft.draft?.tax ?? 0) + (draft.draft?.tip ?? 0)
+);
+
 function onBack() {
   flow.gotoStep(Step.Guests);
 }
@@ -165,6 +173,16 @@ function onContinue() {
               class="w-full"
             />
           </UFormField>
+
+          <div class="flex justify-end pt-2">
+            <UBadge
+              :label="`Total: ${formatCurrency(runningTotal)}`"
+              color="primary"
+              variant="solid"
+              size="lg"
+              class="text-base"
+            />
+          </div>
         </div>
       </template>
     </UCard>
