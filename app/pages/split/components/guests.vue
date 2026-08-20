@@ -19,6 +19,16 @@ function updateGuestName(id: string, value: string) {
 function onContinue() {
   flow.gotoStep(Step.Items);
 }
+
+function incrementGuests() {
+  if (!draft.draft) return;
+  draft.setGuestCount(draft.guestCount + 1);
+}
+
+function decrementGuests() {
+  if (!draft.draft) return;
+  draft.setGuestCount(Math.max(0, draft.guestCount - 1));
+}
 </script>
 
 <template>
@@ -31,14 +41,34 @@ function onContinue() {
     <UCard class="mt-6">
       <div class="flex flex-col gap-6">
         <UFormField label="Number of guests">
-          <UInputNumber
-            v-model="guestCount"
-            :min="0"
-            :increment="true"
-            :decrement="true"
-            placeholder="Number of guests"
-            class="w-full"
-          />
+          <div class="flex items-center gap-2 w-full">
+            <UButton
+              icon="i-lucide-minus"
+              color="neutral"
+              variant="outline"
+              :disabled="draft.guestCount === 0"
+              class="min-h-[44px] min-w-[44px] justify-center"
+              @click="decrementGuests"
+            />
+            <UInput
+              v-model="guestCount"
+              type="number"
+              inputmode="numeric"
+              :min="0"
+              placeholder="Number of guests"
+              class="w-full text-center text-lg"
+              :ui="{
+                base: 'text-center text-lg [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [appearance:textfield]',
+              }"
+            />
+            <UButton
+              icon="i-lucide-plus"
+              color="neutral"
+              variant="outline"
+              class="min-h-[44px] min-w-[44px] justify-center"
+              @click="incrementGuests"
+            />
+          </div>
         </UFormField>
 
         <div

@@ -22,15 +22,6 @@ const createdAtText = computed(() => {
   });
 });
 
-const currency = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-});
-
-function formatCurrency(value: number): string {
-  return currency.format(value);
-}
-
 interface GuestItem {
   item: Item;
   share: number;

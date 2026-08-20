@@ -40,14 +40,6 @@ function allSelected(itemId: string): boolean {
   return item.guestIds.length === draft.guestCount;
 }
 
-function updateLabel(id: string, value: string) {
-  draft.updateItem(id, { label: value });
-}
-
-function updateAmount(id: string, value: number | null) {
-  draft.updateItem(id, { amount: value ?? 0 });
-}
-
 function addItem() {
   draft.addItem();
 }
@@ -99,35 +91,25 @@ function onFinalize() {
       </div>
 
       <div v-else class="flex flex-col gap-4">
-        <div
+        <UCard
           v-for="item in draft.draft.items"
           :key="item.id"
-          class="border rounded-lg p-4 flex flex-col gap-4"
+          class="border border-neutral-200 dark:border-neutral-800"
         >
-          <div class="flex flex-col sm:flex-row gap-3">
-            <UInput
-              :model-value="item.label"
-              placeholder="Item name"
-              class="w-full sm:flex-[3]"
-              @update:model-value="updateLabel(item.id, $event as string)"
-            />
-            <UInputNumber
-              :model-value="item.amount"
-              placeholder="0.00"
-              :min="0"
-              :step="0.01"
-              :increment="false"
-              :decrement="false"
-              :format-options="{
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              }"
-              class="w-full sm:flex-1"
-              @update:model-value="
-                updateAmount(item.id, $event as number | null)
-              "
-            />
-          </div>
+          <template #header>
+            <div class="flex items-center justify-between gap-3">
+              <span class="text-base font-medium truncate">
+                {{ item.label || "Unnamed item" }}
+              </span>
+              <UBadge
+                :label="formatCurrency(item.amount)"
+                color="primary"
+                variant="solid"
+                size="lg"
+                class="text-base"
+              />
+            </div>
+          </template>
 
           <div class="flex flex-col gap-3">
             <div class="flex items-center justify-between">
@@ -141,7 +123,7 @@ function onFinalize() {
               />
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="grid grid-cols-1 sm:grid-cols-2">
               <UCheckbox
                 v-for="(guest, guestIndex) in draft.draft.guests"
                 :key="guest.id"
@@ -151,15 +133,20 @@ function onFinalize() {
                 @update:model-value="toggleGuest(item.id, guest.id)"
               />
             </div>
+          </div>
 
-            <p v-if="item.guestIds.length === 0" class="text-sm text-error-600">
+          <template #footer>
+            <p
+              v-if="item.guestIds.length === 0"
+              class="text-sm text-error-600 text-right"
+            >
               Unassigned
             </p>
-            <p v-else class="text-sm text-neutral-500">
+            <p v-else class="text-sm text-neutral-500 text-right">
               {{ item.guestIds.length }} of {{ draft.guestCount }} guests
             </p>
-          </div>
-        </div>
+          </template>
+        </UCard>
 
         <UFormField label="Tax/tip split">
           <URadioGroup

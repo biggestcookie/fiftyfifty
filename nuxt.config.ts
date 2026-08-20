@@ -75,7 +75,7 @@ export default defineNuxtConfig({
       short_name: "FiftyFifty",
       description:
         "Quickly split bills with friends. No accounts, no servers, fully private.",
-      theme_color: "#00c16a",
+      theme_color: "#3faabe",
       background_color: "#ffffff",
       display: "standalone",
       orientation: "portrait",

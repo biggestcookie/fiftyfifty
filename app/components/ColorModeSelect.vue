@@ -14,7 +14,9 @@ const options: ColorModeOption[] = [
 ];
 
 const preference = computed(
-  () => options.find((option) => option.value === colorMode.preference) ?? options[2]
+  () =>
+    options.find((option) => option.value === colorMode.preference) ??
+    options[2]
 );
 
 const triggerIcon = computed(() => {

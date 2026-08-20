@@ -9,10 +9,6 @@ const checks = computed(() =>
 );
 
 const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
-const currencyFormatter = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-});
 
 function formatRelative(timestamp: number): string {
   const diff = (timestamp - Date.now()) / 1000;
@@ -38,10 +34,6 @@ function formatRelative(timestamp: number): string {
   return rtf.format(Math.round(diff), "second");
 }
 
-function formatCurrency(amount: number): string {
-  return currencyFormatter.format(amount);
-}
-
 function grandTotal(check: Check): number {
   return Object.values(check.totals).reduce((sum, value) => sum + value, 0);
 }
@@ -59,8 +51,11 @@ async function onDelete(id: string) {
 </script>
 
 <template>
-  <UCard v-if="checks.length > 0" title="Recent checks">
-    <div class="flex flex-col gap-2">
+  <UCard title="Recent checks">
+    <div v-if="checks.length === 0" class="text-sm text-neutral-500">
+      No recent checks!
+    </div>
+    <div v-else class="flex flex-col gap-2">
       <div
         v-for="check in checks"
         :key="check.id"

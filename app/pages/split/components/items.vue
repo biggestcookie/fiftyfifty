@@ -86,7 +86,7 @@ function onContinue() {
           <div
             v-for="item in items"
             :key="item.id"
-            class="grid grid-cols-1 items-end gap-3 sm:grid-cols-[3fr_1fr_auto]"
+            class="grid grid-cols-1 items-center gap-3 sm:grid-cols-[3fr_1fr_auto]"
           >
             <UInput
               :model-value="item.label"
@@ -113,11 +113,11 @@ function onContinue() {
             />
 
             <UButton
-              label="Remove"
+              icon="i-lucide-trash"
               variant="ghost"
               color="error"
               size="sm"
-              class="min-h-[44px]"
+              class="min-h-[44px] min-w-[44px] self-center justify-center"
               @click="removeItem(item.id)"
             />
           </div>
@@ -131,46 +131,42 @@ function onContinue() {
           @click="addItem"
         />
       </div>
-    </UCard>
 
-    <UCard class="mt-6">
-      <template #header>
-        <h2 class="text-lg font-semibold">Extras</h2>
+      <template #footer>
+        <div class="flex flex-col gap-4">
+          <UFormField label="Tax">
+            <UInputNumber
+              v-model="tax"
+              placeholder="0.00"
+              :min="0"
+              :step="0.01"
+              :increment="false"
+              :decrement="false"
+              :format-options="{
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              }"
+              class="w-full"
+            />
+          </UFormField>
+
+          <UFormField label="Tip">
+            <UInputNumber
+              v-model="tip"
+              placeholder="0.00"
+              :min="0"
+              :step="0.01"
+              :increment="false"
+              :decrement="false"
+              :format-options="{
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              }"
+              class="w-full"
+            />
+          </UFormField>
+        </div>
       </template>
-
-      <div class="flex flex-col gap-4">
-        <UFormField label="Tax">
-          <UInputNumber
-            v-model="tax"
-            placeholder="0.00"
-            :min="0"
-            :step="0.01"
-            :increment="false"
-            :decrement="false"
-            :format-options="{
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            }"
-            class="w-full"
-          />
-        </UFormField>
-
-        <UFormField label="Tip">
-          <UInputNumber
-            v-model="tip"
-            placeholder="0.00"
-            :min="0"
-            :step="0.01"
-            :increment="false"
-            :decrement="false"
-            :format-options="{
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            }"
-            class="w-full"
-          />
-        </UFormField>
-      </div>
     </UCard>
 
     <div class="mt-6 flex flex-col gap-3 sm:flex-row">
