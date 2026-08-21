@@ -9,7 +9,7 @@ useSeoMeta({
   <UContainer>
     <UPageHero
       title="FiftyFifty"
-      description="Just here to split the check. No signups, installs, or selling your data."
+      description="Just here to split the check. No signups, forced installs, or selling your data."
       :links="[
         {
           label: 'Split new check',
@@ -20,5 +20,7 @@ useSeoMeta({
     />
 
     <Recents class="mb-8" />
+
+    <InstallPwaButton />
   </UContainer>
 </template>
