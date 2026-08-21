@@ -95,7 +95,13 @@ function onFinalize() {
         class="text-center py-10"
       >
         <p class="text-neutral-500 mb-4">No items yet.</p>
-        <UButton label="Add item" size="lg" block @click="addItem" />
+        <UButton
+          icon="i-lucide-plus"
+          label="Add item"
+          size="lg"
+          block
+          @click="addItem"
+        />
       </div>
 
       <div v-else class="flex flex-col gap-4">

@@ -87,38 +87,45 @@ function onContinue() {
           <p class="text-neutral-500">
             No items yet. Add the first item from the receipt.
           </p>
-          <UButton label="Add item" block @click="addItem" />
+          <UButton
+            icon="i-lucide-plus"
+            label="Add item"
+            block
+            @click="addItem"
+          />
         </div>
 
         <div v-else class="flex flex-col gap-4">
           <div
             v-for="item in items"
             :key="item.id"
-            class="grid grid-cols-1 items-center gap-3 sm:grid-cols-[3fr_1fr_auto]"
+            class="grid grid-cols-[1fr_auto] my-3 items-center gap-3 sm:grid-cols-[3fr_1fr_auto] sm:items-center"
           >
-            <UInput
-              :model-value="item.label"
-              placeholder="Item name"
-              class="w-full"
-              @update:model-value="updateLabel(item.id, $event as string)"
-            />
+            <div class="flex flex-col gap-3 sm:contents">
+              <UInput
+                :model-value="item.label"
+                placeholder="Item name"
+                class="w-full"
+                @update:model-value="updateLabel(item.id, $event as string)"
+              />
 
-            <UInputNumber
-              :model-value="item.amount"
-              placeholder="0.00"
-              :min="0"
-              :step="0.01"
-              :increment="false"
-              :decrement="false"
-              :format-options="{
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              }"
-              class="w-full"
-              @update:model-value="
-                updateAmount(item.id, $event as number | null)
-              "
-            />
+              <UInputNumber
+                :model-value="item.amount"
+                placeholder="0.00"
+                :min="0"
+                :step="0.01"
+                :increment="false"
+                :decrement="false"
+                :format-options="{
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                }"
+                class="w-full"
+                @update:model-value="
+                  updateAmount(item.id, $event as number | null)
+                "
+              />
+            </div>
 
             <UButton
               icon="i-lucide-trash"
@@ -133,6 +140,7 @@ function onContinue() {
 
         <UButton
           v-if="itemCount > 0"
+          icon="i-lucide-plus"
           label="Add item"
           variant="outline"
           block

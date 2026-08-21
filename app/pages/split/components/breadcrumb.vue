@@ -65,16 +65,19 @@ function lineClasses(index: number): string {
   if (currentIndex.value === index) return "bg-primary-200";
   return "bg-neutral-200";
 }
+
+const gridCols = computed(() => {
+  const template = steps.map((_, index) =>
+    index < steps.length - 1 ? "1fr 1fr" : "1fr"
+  );
+  return { gridTemplateColumns: template.join(" ") };
+});
 </script>
 
 <template>
   <nav aria-label="Split steps">
-    <ol class="flex items-center gap-2">
-      <li
-        v-for="(item, index) in steps"
-        :key="item.step"
-        class="flex items-center flex-1"
-      >
+    <ol class="grid items-center gap-x-2" :style="gridCols">
+      <li v-for="(item, index) in steps" :key="item.step" class="contents">
         <UButton
           :aria-current="isActive(index) ? 'step' : undefined"
           :disabled="isLockedFuture(index)"
@@ -88,19 +91,26 @@ function lineClasses(index: number): string {
               : 'ghost'
           "
           :color="isLockedFuture(index) ? 'neutral' : 'primary'"
-          :icon="isDone(index) ? 'i-lucide-check' : undefined"
           :label="item.label"
           size="md"
-          class="flex-1 justify-center min-h-[44px]"
+          class="w-full justify-center min-h-[44px]"
           @click="
             isDone(index) || isReachableFuture(index)
               ? goToStep(item.step)
               : undefined
           "
-        />
+        >
+          <template #leading>
+            <UIcon v-if="isDone(index)" name="i-lucide-check" class="size-4" />
+            <span v-else class="size-4 block" aria-hidden="true" />
+          </template>
+          <template #trailing>
+            <span class="size-4 block" aria-hidden="true" />
+          </template>
+        </UButton>
         <div
           v-if="index < steps.length - 1"
-          class="mx-2 h-0.5 flex-1 min-w-[16px]"
+          class="h-0.5 min-w-[16px]"
           :class="lineClasses(index)"
         />
       </li>
