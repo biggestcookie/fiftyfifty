@@ -10,15 +10,15 @@ async function onInstallClick() {
 </script>
 
 <template>
-  <div v-if="state !== 'unsupported' && state !== 'installed'" class="my-6">
+  <div v-if="state !== 'unsupported' && state !== 'installed'" class="my-6 flex justify-center">
     <UButton
       v-if="state === 'supported'"
       icon="i-lucide-download"
       color="primary"
-      variant="solid"
+      variant="outline"
       @click="onInstallClick"
     >
-      Add to Home Screen
+      Install (optional)
     </UButton>
 
     <UButton
