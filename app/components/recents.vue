@@ -89,7 +89,7 @@ async function onDelete(id: string) {
 
           <div class="flex flex-col items-end gap-0.5 whitespace-nowrap">
             <span class="font-semibold">
-              {{ formatCurrency(grandTotal(check)) }}
+              {{ formatCurrency(grandTotal(check), check.currencySymbol) }}
             </span>
             <span class="text-sm text-neutral-500">
               {{ formatRelative(check.createdAt) }}

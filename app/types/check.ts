@@ -27,6 +27,7 @@ export interface Draft {
   tax: number;
   tip: number;
   taxTipMode: TaxTipMode;
+  currencySymbol: string;
   currentStep: Step;
   updatedAt: number;
 }

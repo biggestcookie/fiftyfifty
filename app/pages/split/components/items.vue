@@ -34,6 +34,22 @@ const tip = computed<number | null>({
   },
 });
 
+const currencySymbol = computed<string>({
+  get: () => draft.draft?.currencySymbol ?? "$",
+  set: (value) => {
+    draft.setCurrencySymbol(value);
+  },
+});
+
+const currencySymbolItems = CURRENCY_SYMBOLS.map((s) => ({
+  label: s,
+  value: s,
+}));
+
+const decimals = computed(() =>
+  currencySymbol.value === "¥" || currencySymbol.value === "¢" ? 0 : 2
+);
+
 function updateLabel(id: string, value: string) {
   draft.updateItem(id, { label: value });
 }
@@ -124,8 +140,8 @@ function onContinue() {
                 :increment="false"
                 :decrement="false"
                 :format-options="{
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
+                  minimumFractionDigits: decimals,
+                  maximumFractionDigits: decimals,
                 }"
                 class="w-full"
                 @update:model-value="
@@ -166,8 +182,8 @@ function onContinue() {
               :increment="false"
               :decrement="false"
               :format-options="{
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
+                minimumFractionDigits: decimals,
+                maximumFractionDigits: decimals,
               }"
               class="w-full"
             />
@@ -182,16 +198,39 @@ function onContinue() {
               :increment="false"
               :decrement="false"
               :format-options="{
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
+                minimumFractionDigits: decimals,
+                maximumFractionDigits: decimals,
               }"
               class="w-full"
             />
           </UFormField>
 
+          <UFormField label="Currency">
+            <UDropdownMenu
+              :items="
+                currencySymbolItems.map((item) => ({
+                  ...item,
+                  type: 'checkbox' as const,
+                  checked: currencySymbol === item.value,
+                  onUpdateChecked: (checked: boolean) => {
+                    if (checked) currencySymbol = item.value;
+                  },
+                }))
+              "
+            >
+              <UButton
+                :label="currencySymbol"
+                color="neutral"
+                variant="outline"
+                block
+                class="min-h-[44px] justify-center text-lg font-semibold"
+              />
+            </UDropdownMenu>
+          </UFormField>
+
           <div class="flex justify-end pt-2">
             <UBadge
-              :label="`Total: ${formatCurrency(runningTotal)}`"
+              :label="`Total: ${formatCurrency(runningTotal, currencySymbol)}`"
               color="primary"
               variant="solid"
               size="lg"

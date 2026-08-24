@@ -123,7 +123,12 @@ function onFinalize() {
                 {{ item.label || "Unnamed item" }}
               </span>
               <UBadge
-                :label="formatCurrency(item.amount)"
+                :label="
+                  formatCurrency(
+                    item.amount,
+                    draft.draft?.currencySymbol ?? '$'
+                  )
+                "
                 color="primary"
                 variant="solid"
                 size="lg"
@@ -181,7 +186,10 @@ function onFinalize() {
       <template #footer>
         <div class="flex justify-end">
           <UBadge
-            :label="`Total: ${formatCurrency(runningTotal)}`"
+            :label="`Total: ${formatCurrency(
+              runningTotal,
+              draft.draft?.currencySymbol ?? '$'
+            )}`"
             color="primary"
             variant="solid"
             size="lg"

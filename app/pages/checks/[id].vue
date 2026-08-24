@@ -132,7 +132,7 @@ onMounted(async () => {
               summary.label
             }}</span>
             <span class="text-lg font-semibold">{{
-              formatCurrency(summary.value)
+              formatCurrency(summary.value, check.currencySymbol)
             }}</span>
           </div>
         </UCard>
@@ -175,7 +175,7 @@ onMounted(async () => {
           >
             <span class="truncate">{{ item.label || "Unnamed item" }}</span>
             <span class="font-medium whitespace-nowrap">{{
-              formatCurrency(item.amount)
+              formatCurrency(item.amount, check.currencySymbol)
             }}</span>
           </li>
         </ul>
@@ -219,7 +219,7 @@ onMounted(async () => {
             }}</span>
             <div class="flex items-center gap-3 shrink-0">
               <UBadge
-                :label="formatCurrency(breakdown.total)"
+                :label="formatCurrency(breakdown.total, check.currencySymbol)"
                 color="primary"
                 variant="solid"
                 size="lg"
@@ -260,7 +260,7 @@ onMounted(async () => {
                   guestItem.item.label || "Unnamed item"
                 }}</span>
                 <span class="font-medium whitespace-nowrap">{{
-                  formatCurrency(guestItem.share)
+                  formatCurrency(guestItem.share, check.currencySymbol)
                 }}</span>
               </li>
             </ul>
@@ -270,7 +270,7 @@ onMounted(async () => {
             >
               <span>Tax/tip share</span>
               <span class="font-medium">{{
-                formatCurrency(breakdown.taxTipShare)
+                formatCurrency(breakdown.taxTipShare, check.currencySymbol)
               }}</span>
             </div>
           </div>

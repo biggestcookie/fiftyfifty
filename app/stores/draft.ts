@@ -14,6 +14,7 @@ function emptyDraft(): Draft {
     tax: 0,
     tip: 0,
     taxTipMode: TaxTipMode.Proportional,
+    currencySymbol: "$",
     currentStep: Step.Guests,
     updatedAt: Date.now(),
   };
@@ -86,6 +87,10 @@ export const useDraftStore = defineStore("draft", {
       if (this.draft) this.draft.taxTipMode = mode;
     },
 
+    setCurrencySymbol(symbol: string) {
+      if (this.draft) this.draft.currencySymbol = symbol;
+    },
+
     toggleItemGuest(itemId: string, guestId: string) {
       if (!this.draft) return;
       const item = this.draft.items.find((i) => i.id === itemId);
@@ -112,6 +117,7 @@ export const useDraftStore = defineStore("draft", {
         tax: check.tax,
         tip: check.tip,
         taxTipMode: check.taxTipMode,
+        currencySymbol: check.currencySymbol,
         currentStep: Step.Guests, // resume at the start of the flow so user can review guests/items
         updatedAt: Date.now(),
       };
@@ -167,6 +173,7 @@ export const useDraftStore = defineStore("draft", {
         tax: d.tax,
         tip: d.tip,
         taxTipMode: d.taxTipMode,
+        currencySymbol: d.currencySymbol,
         currentStep: Step.Receipt,
         updatedAt: Date.now(),
         totals,
