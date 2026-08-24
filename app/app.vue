@@ -23,6 +23,7 @@ useSeoMeta({
 });
 
 const checkStore = useCheckStore();
+const config = useRuntimeConfig();
 
 onMounted(async () => {
   await checkStore.loadAll();
@@ -50,5 +51,12 @@ onMounted(async () => {
     <UMain>
       <NuxtPage />
     </UMain>
+
+    <footer
+      class="text-center text-xs text-muted py-4"
+      aria-label="App version"
+    >
+      v{{ config.public.appVersion }}
+    </footer>
   </UApp>
 </template>

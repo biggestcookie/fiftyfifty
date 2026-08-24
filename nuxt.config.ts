@@ -1,4 +1,5 @@
 import { defineNuxtConfig } from "nuxt/config";
+import pkg from "./package.json" with { type: "json" };
 
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
@@ -14,6 +15,11 @@ export default defineNuxtConfig({
   ],
   devtools: {
     enabled: true,
+  },
+  runtimeConfig: {
+    public: {
+      appVersion: pkg.version,
+    },
   },
   app: {
     baseURL: "/",
@@ -107,13 +113,17 @@ export default defineNuxtConfig({
     workbox: {
       navigateFallback: "200.html",
       globPatterns: ["**/*.{js,mjs,css,html,png,svg,ico,woff,woff2,json}"],
+      cleanupOutdatedCaches: true,
+      clientsClaim: true,
+      skipWaiting: true,
       runtimeCaching: [
         {
           urlPattern: ({ request }) => request.mode === "navigate",
           handler: "NetworkFirst",
           options: {
             cacheName: "pages",
-            networkTimeoutSeconds: 3,
+            networkTimeoutSeconds: 1,
+            expiration: { maxEntries: 1 },
           },
         },
       ],
