@@ -132,20 +132,13 @@ function onContinue() {
                 @update:model-value="updateLabel(item.id, $event as string)"
               />
 
-              <UInputNumber
+              <CurrencyInput
                 :model-value="item.amount"
+                :decimals="decimals"
                 placeholder="0.00"
-                :min="0"
-                :step="0.01"
-                :increment="false"
-                :decrement="false"
-                :format-options="{
-                  minimumFractionDigits: decimals,
-                  maximumFractionDigits: decimals,
-                }"
                 class="w-full"
                 @update:model-value="
-                  updateAmount(item.id, $event as number | null)
+                  updateAmount(item.id, $event as number)
                 "
               />
             </div>
@@ -174,34 +167,22 @@ function onContinue() {
       <template #footer>
         <div class="flex flex-col gap-4">
           <UFormField label="Tax">
-            <UInputNumber
-              v-model="tax"
+            <CurrencyInput
+              :model-value="tax ?? 0"
+              :decimals="decimals"
               placeholder="0.00"
-              :min="0"
-              :step="0.01"
-              :increment="false"
-              :decrement="false"
-              :format-options="{
-                minimumFractionDigits: decimals,
-                maximumFractionDigits: decimals,
-              }"
               class="w-full"
+              @update:model-value="(v) => (tax = v)"
             />
           </UFormField>
 
           <UFormField label="Tip">
-            <UInputNumber
-              v-model="tip"
+            <CurrencyInput
+              :model-value="tip ?? 0"
+              :decimals="decimals"
               placeholder="0.00"
-              :min="0"
-              :step="0.01"
-              :increment="false"
-              :decrement="false"
-              :format-options="{
-                minimumFractionDigits: decimals,
-                maximumFractionDigits: decimals,
-              }"
               class="w-full"
+              @update:model-value="(v) => (tip = v)"
             />
           </UFormField>
 
