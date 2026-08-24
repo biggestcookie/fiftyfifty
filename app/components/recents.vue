@@ -57,8 +57,15 @@ async function onDelete(id: string) {
     </div>
     <div v-else class="flex flex-col gap-2">
       <div
-        v-for="check in checks"
+        v-for="(check, index) in checks"
         :key="check.id"
+        v-motion
+        :initial="{ opacity: 0, x: -12 }"
+        :enter="{
+          opacity: 1,
+          x: 0,
+          transition: { duration: 300, delay: index * 50 },
+        }"
         class="flex items-center gap-2"
       >
         <NuxtLink

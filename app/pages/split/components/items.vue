@@ -97,8 +97,15 @@ function onContinue() {
 
         <div v-else class="flex flex-col gap-4">
           <div
-            v-for="item in items"
+            v-for="(item, index) in items"
             :key="item.id"
+            v-motion
+            :initial="{ opacity: 0, y: 12 }"
+            :enter="{
+              opacity: 1,
+              y: 0,
+              transition: { duration: 250, delay: index * 40 },
+            }"
             class="grid grid-cols-[1fr_auto] my-3 items-center gap-3 sm:grid-cols-[3fr_1fr_auto] sm:items-center"
           >
             <div class="flex flex-col gap-3 sm:contents">

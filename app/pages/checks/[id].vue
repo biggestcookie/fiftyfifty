@@ -116,7 +116,17 @@ onMounted(async () => {
 
     <template v-else>
       <div class="mt-6 grid grid-cols-3 gap-3">
-        <UCard v-for="summary in summaryCards" :key="summary.label">
+        <UCard
+          v-for="(summary, index) in summaryCards"
+          :key="summary.label"
+          v-motion
+          :initial="{ opacity: 0, y: 12 }"
+          :enter="{
+            opacity: 1,
+            y: 0,
+            transition: { duration: 250, delay: index * 80 },
+          }"
+        >
           <div class="flex flex-col items-center text-center">
             <span class="text-xs uppercase tracking-wide text-neutral-500">{{
               summary.label
@@ -128,7 +138,12 @@ onMounted(async () => {
         </UCard>
       </div>
 
-      <UCard class="mt-4">
+      <UCard
+        v-motion
+        :initial="{ opacity: 0, y: 12 }"
+        :enter="{ opacity: 1, y: 0, transition: { duration: 250, delay: 240 } }"
+        class="mt-4"
+      >
         <button
           type="button"
           class="w-full flex items-center justify-between gap-4 min-h-[44px] text-left"
@@ -148,7 +163,10 @@ onMounted(async () => {
 
         <ul
           v-if="itemsExpanded && check.items.length > 0"
-          class="mt-4 flex flex-col gap-2"
+          v-motion
+          :initial="{ opacity: 0, height: 0 }"
+          :enter="{ opacity: 1, height: 'auto', transition: { duration: 200 } }"
+          class="mt-4 flex flex-col gap-2 overflow-hidden"
         >
           <li
             v-for="item in check.items"
@@ -163,7 +181,12 @@ onMounted(async () => {
         </ul>
       </UCard>
 
-      <div class="mt-4 flex justify-center">
+      <div
+        v-motion
+        :initial="{ opacity: 0 }"
+        :enter="{ opacity: 1, transition: { duration: 300, delay: 200 } }"
+        class="mt-4 flex justify-center"
+      >
         <UButton
           label="Edit check"
           variant="ghost"
@@ -176,8 +199,15 @@ onMounted(async () => {
 
       <div class="mt-4 flex flex-col gap-4">
         <UCard
-          v-for="breakdown in guestsWithBreakdown"
+          v-for="(breakdown, index) in guestsWithBreakdown"
           :key="breakdown.guest.id"
+          v-motion
+          :initial="{ opacity: 0, y: 12 }"
+          :enter="{
+            opacity: 1,
+            y: 0,
+            transition: { duration: 250, delay: 320 + index * 60 },
+          }"
         >
           <button
             type="button"
@@ -207,7 +237,14 @@ onMounted(async () => {
 
           <div
             v-if="uiStore.isExpanded(breakdown.guest.id)"
-            class="mt-4 flex flex-col gap-4"
+            v-motion
+            :initial="{ opacity: 0, height: 0 }"
+            :enter="{
+              opacity: 1,
+              height: 'auto',
+              transition: { duration: 200 },
+            }"
+            class="mt-4 flex flex-col gap-4 overflow-hidden"
           >
             <div v-if="breakdown.items.length === 0" class="text-neutral-500">
               No items

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 const { state, install } = usePwaInstall();
 
-const IOS_INSTRUCTIONS_URL = "https://www.cdc.gov/niosh/mining/tools/installpwa.html#heading-trtazs7hwj";
+const IOS_INSTRUCTIONS_URL =
+  "https://www.cdc.gov/niosh/mining/tools/installpwa.html#heading-trtazs7hwj";
 
 async function onInstallClick() {
   await install();

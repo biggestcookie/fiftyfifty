@@ -6,8 +6,14 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 export function usePwaInstall() {
-  const state = useState<PwaInstallState>("pwa-install-state", () => "unsupported");
-  const deferredPrompt = useState<BeforeInstallPromptEvent | null>("pwa-install-prompt", () => null);
+  const state = useState<PwaInstallState>(
+    "pwa-install-state",
+    () => "unsupported"
+  );
+  const deferredPrompt = useState<BeforeInstallPromptEvent | null>(
+    "pwa-install-prompt",
+    () => null
+  );
 
   if (import.meta.client) {
     onMounted(() => {
@@ -23,7 +29,8 @@ export function usePwaInstall() {
 
       const ua = navigator.userAgent;
       const isIOS = /iPad|iPhone|iPod/.test(ua) && !("MSStream" in window);
-      const isSafariIOS = isIOS && /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua);
+      const isSafariIOS =
+        isIOS && /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua);
       const isMobile = isIOS || /Android|Mobile/.test(ua);
       const hasBeforeInstall = "onbeforeinstallprompt" in window;
 

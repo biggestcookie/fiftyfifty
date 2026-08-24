@@ -17,6 +17,8 @@ export default defineNuxtConfig({
   },
   app: {
     baseURL: "/",
+    pageTransition: { name: "page", mode: "out-in" },
+    layoutTransition: { name: "layout", mode: "out-in" },
   },
   nitro: {
     preset: "netlify",

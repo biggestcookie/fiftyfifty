@@ -106,8 +106,15 @@ function onFinalize() {
 
       <div v-else class="flex flex-col gap-4">
         <UCard
-          v-for="item in draft.draft.items"
+          v-for="(item, index) in draft.draft.items"
           :key="item.id"
+          v-motion
+          :initial="{ opacity: 0, y: 12 }"
+          :enter="{
+            opacity: 1,
+            y: 0,
+            transition: { duration: 250, delay: index * 50 },
+          }"
           class="border border-neutral-200 dark:border-neutral-800"
         >
           <template #header>

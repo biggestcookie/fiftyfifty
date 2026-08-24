@@ -33,7 +33,15 @@ onMounted(async () => {
   <UApp>
     <VitePwaManifest />
 
-    <UHeader title="50/50" to="/" :toggle="false" :ui="{ root: 'static' }">
+    <UHeader
+      v-motion
+      :initial="{ opacity: 0, y: -8 }"
+      :enter="{ opacity: 1, y: 0, transition: { duration: 250 } }"
+      title="FiftyFifty"
+      to="/"
+      :toggle="false"
+      :ui="{ root: 'static' }"
+    >
       <template #right>
         <ColorModeSelect />
       </template>
