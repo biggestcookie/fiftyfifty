@@ -6,10 +6,16 @@ const router = useRouter();
 const checkStore = useCheckStore();
 const uiStore = useUiStore();
 const flow = useSplitFlow();
+const { share, isSharing } = useShareCheck();
 
 function onEdit() {
   if (!check.value) return;
   flow.edit(check.value);
+}
+
+function onShare() {
+  if (!check.value) return;
+  share(check.value);
 }
 
 const check = ref<Check | null>(null);
@@ -185,7 +191,7 @@ onMounted(async () => {
         v-motion
         :initial="{ opacity: 0 }"
         :enter="{ opacity: 1, transition: { duration: 300, delay: 200 } }"
-        class="mt-4 flex justify-center"
+        class="mt-4 flex justify-center gap-3"
       >
         <UButton
           label="Edit check"
@@ -194,6 +200,16 @@ onMounted(async () => {
           icon="i-lucide-pencil"
           class="min-h-[44px]"
           @click="onEdit"
+        />
+        <UButton
+          label="Share"
+          variant="ghost"
+          color="neutral"
+          icon="i-lucide-share-2"
+          class="min-h-[44px]"
+          :loading="isSharing"
+          :disabled="isSharing"
+          @click="onShare"
         />
       </div>
 
