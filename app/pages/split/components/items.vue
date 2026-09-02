@@ -200,11 +200,12 @@ async function onFileSelected(event: Event) {
   const file = input.files?.[0];
   if (!file) return;
 
-  // If the draft already has items, confirm before overwriting. `confirm()`
-  // is synchronous and blocks the JS event loop, which is fine here — the
-  // file input already produced the event and we either continue or bail.
-  // `replaceFromScan` would wipe items + fees without warning otherwise.
-  if (itemCount.value > 0) {
+  const items = draft.draft?.items ?? [];
+  const fees = draft.draft?.fees ?? [];
+  const hasUserContent =
+    items.some((i) => i.label.trim().length > 0 || i.amount > 0) ||
+    fees.some((f) => f.label.trim().length > 0 || f.amount > 0);
+  if (hasUserContent) {
     const ok = window.confirm(
       "Scanning will replace your current items and fees. Continue?"
     );
