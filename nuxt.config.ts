@@ -29,6 +29,19 @@ export default defineNuxtConfig({
   nitro: {
     preset: "netlify",
   },
+  routeRules: {
+    // Long-lived cache for the OCR model assets. Non-PWA users without a
+    // registered service worker rely on the browser's HTTP cache; pinning
+    // `max-age=31536000, immutable` means the ~164 MB of tars and ORT
+    // WASM files are downloaded at most once per browser per version.
+    // Future model bumps land at a new content-stamped filename so the
+    // browser refetches only the changed file.
+    "/models/ocr/**": {
+      headers: {
+        "cache-control": "public, max-age=31536000, immutable",
+      },
+    },
+  },
   css: ["~/assets/css/main.css"],
   compatibilityDate: "2025-01-15",
   typescript: {
@@ -55,6 +68,13 @@ export default defineNuxtConfig({
     },
     resolve: {
       alias: [],
+    },
+    // The OCR worker pulls in @paddleocr/paddleocr-js, which uses dynamic
+    // imports for its inner WASM assets. Default worker format is 'iife',
+    // which doesn't support code-splitting — switch to 'es' so the build
+    // can produce chunked output for the worker.
+    worker: {
+      format: "es",
     },
     optimizeDeps: {
       include: [
@@ -156,7 +176,25 @@ export default defineNuxtConfig({
 
     workbox: {
       navigateFallback: "200.html",
-      globPatterns: ["**/*.{js,mjs,css,html,png,svg,ico,woff,woff2,json}"],
+      // Globbing Workbox's precache:
+      // - `**/*.{js,mjs,css,html,png,svg,ico,woff,woff2,json,tar,wasm}`
+      //   covers the app shell + the OCR model tars (~17 MB total) + the
+      //   paddleocr-worker-entry.mjs (~11 MB) + Vite-emitted chunks.
+      // - The ORT WASM variants (`ort-wasm-simd-threaded.{jsep,jspi,
+      //   asyncify}.wasm`, 16–28 MB each) are also picked up so any
+      //   browser's first scan works offline. Total precache footprint
+      //   is ~135 MB — well under the original ~1 GB donut alternative,
+      //   and the trade-off is worth it: no model download on first
+      //   scan, no "Preparing scanner…" tick, no offline-model gap.
+      //   The runtime `ocr-models` cache rule remains in place as the
+      //   long-lived storage and as the fallback if a future model
+      //   variant is added without a precache bump.
+      globPatterns: [
+        "**/*.{js,mjs,css,html,png,svg,ico,woff,woff2,json,tar,wasm}",
+      ],
+      // Largest single file is the ORT WASM jsep variant at ~28 MB;
+      // raise the cap so Workbox doesn't warn about exceeded files.
+      maximumFileSizeToCacheInBytes: 32 * 1024 * 1024,
       cleanupOutdatedCaches: true,
       clientsClaim: true,
       skipWaiting: true,

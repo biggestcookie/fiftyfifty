@@ -1,9 +1,10 @@
 import { defineStore } from "pinia";
 import {
   Step,
-  TaxTipMode,
+  FeesMode,
   type Draft,
   type Check,
+  type Fee,
   type Item,
 } from "~/types/check";
 
@@ -11,9 +12,11 @@ function emptyDraft(): Draft {
   return {
     guests: [],
     items: [],
-    tax: 0,
-    tip: 0,
-    taxTipMode: TaxTipMode.Proportional,
+    fees: [
+      { id: crypto.randomUUID(), label: "Tax", amount: 0 },
+      { id: crypto.randomUUID(), label: "Tip", amount: 0 },
+    ],
+    feesMode: FeesMode.Proportional,
     currencySymbol: "$",
     currentStep: Step.Guests,
     updatedAt: Date.now(),
@@ -35,6 +38,8 @@ export const useDraftStore = defineStore("draft", {
     guestCount: (state) => state.draft?.guests.length ?? 0,
     itemCount: (state) => state.draft?.items.length ?? 0,
     canUndoScan: (state) => state.scanUndoSnapshot !== null,
+    feesTotal: (state) =>
+      state.draft?.fees.reduce((sum, f) => sum + f.amount, 0) ?? 0,
   },
   actions: {
     start() {
@@ -80,14 +85,23 @@ export const useDraftStore = defineStore("draft", {
       this.draft.items = this.draft.items.filter((i) => i.id !== id);
     },
 
-    setTax(tax: number) {
-      if (this.draft) this.draft.tax = tax;
+    addFee(label = "", amount = 0): Fee {
+      const fee: Fee = { id: uid(), label, amount };
+      if (this.draft) this.draft.fees.push(fee);
+      return fee;
     },
-    setTip(tip: number) {
-      if (this.draft) this.draft.tip = tip;
+    updateFee(id: string, patch: Partial<Omit<Fee, "id">>) {
+      if (!this.draft) return;
+      const fee = this.draft.fees.find((f) => f.id === id);
+      if (fee) Object.assign(fee, patch);
     },
-    setTaxTipMode(mode: TaxTipMode) {
-      if (this.draft) this.draft.taxTipMode = mode;
+    removeFee(id: string) {
+      if (!this.draft) return;
+      this.draft.fees = this.draft.fees.filter((f) => f.id !== id);
+    },
+
+    setFeesMode(mode: FeesMode) {
+      if (this.draft) this.draft.feesMode = mode;
     },
 
     setCurrencySymbol(symbol: string) {
@@ -118,9 +132,8 @@ export const useDraftStore = defineStore("draft", {
       this.draft = {
         guests: check.guests.map((g) => ({ ...g })),
         items: check.items.map((i) => ({ ...i, guestIds: [...i.guestIds] })),
-        tax: check.tax,
-        tip: check.tip,
-        taxTipMode: check.taxTipMode,
+        fees: check.fees.map((f) => ({ ...f })),
+        feesMode: check.feesMode,
         currencySymbol: check.currencySymbol,
         currentStep: Step.Guests, // resume at the start of the flow so user can review guests/items
         updatedAt: Date.now(),
@@ -129,13 +142,10 @@ export const useDraftStore = defineStore("draft", {
       this.scanUndoSnapshot = null;
     },
 
-    replaceFromScan(
-      scan: {
-        items: Array<{ label: string; amount: number }>;
-        tax: number;
-        tip: number;
-      }
-    ) {
+    replaceFromScan(scan: {
+      items: Array<{ label: string; amount: number }>;
+      fees: Array<{ label: string; amount: number }>;
+    }) {
       if (!this.draft) return;
       this.scanUndoSnapshot = {
         guests: this.draft.guests.map((g) => ({ ...g })),
@@ -143,9 +153,8 @@ export const useDraftStore = defineStore("draft", {
           ...i,
           guestIds: [...i.guestIds],
         })),
-        tax: this.draft.tax,
-        tip: this.draft.tip,
-        taxTipMode: this.draft.taxTipMode,
+        fees: this.draft.fees.map((f) => ({ ...f })),
+        feesMode: this.draft.feesMode,
         currencySymbol: this.draft.currencySymbol,
         currentStep: this.draft.currentStep,
         updatedAt: this.draft.updatedAt,
@@ -156,8 +165,11 @@ export const useDraftStore = defineStore("draft", {
         amount: item.amount,
         guestIds: [],
       }));
-      this.draft.tax = scan.tax;
-      this.draft.tip = scan.tip;
+      this.draft.fees = scan.fees.map((fee) => ({
+        id: crypto.randomUUID(),
+        label: fee.label,
+        amount: fee.amount,
+      }));
       this.draft.updatedAt = Date.now();
     },
 
@@ -168,8 +180,7 @@ export const useDraftStore = defineStore("draft", {
         ...i,
         guestIds: [...i.guestIds],
       }));
-      this.draft.tax = snapshot.tax;
-      this.draft.tip = snapshot.tip;
+      this.draft.fees = snapshot.fees.map((f) => ({ ...f }));
       this.scanUndoSnapshot = null;
     },
 
@@ -183,9 +194,11 @@ export const useDraftStore = defineStore("draft", {
       const totals: Record<string, number> = {};
       for (const g of d.guests) totals[g.id] = 0;
 
-      if (d.taxTipMode === TaxTipMode.Equal) {
+      const feesTotal = d.fees.reduce((sum, f) => sum + f.amount, 0);
+
+      if (d.feesMode === FeesMode.Equal) {
         const extraPerGuest =
-          d.guests.length > 0 ? (d.tax + d.tip) / d.guests.length : 0;
+          d.guests.length > 0 ? feesTotal / d.guests.length : 0;
         for (const item of d.items) {
           if (item.guestIds.length === 0) continue;
           const share = item.amount / item.guestIds.length;
@@ -198,9 +211,8 @@ export const useDraftStore = defineStore("draft", {
         }
       } else {
         const itemSubtotal = d.items.reduce((s, i) => s + i.amount, 0);
-        const extra = d.tax + d.tip;
         const scale =
-          itemSubtotal > 0 ? (itemSubtotal + extra) / itemSubtotal : 1;
+          itemSubtotal > 0 ? (itemSubtotal + feesTotal) / itemSubtotal : 1;
 
         for (const item of d.items) {
           if (item.guestIds.length === 0) continue;
@@ -223,9 +235,8 @@ export const useDraftStore = defineStore("draft", {
         createdAt,
         guests: d.guests,
         items: d.items,
-        tax: d.tax,
-        tip: d.tip,
-        taxTipMode: d.taxTipMode,
+        fees: d.fees,
+        feesMode: d.feesMode,
         currencySymbol: d.currencySymbol,
         currentStep: Step.Receipt,
         updatedAt: Date.now(),

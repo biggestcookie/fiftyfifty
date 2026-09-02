@@ -27,7 +27,7 @@ export function useCurrencyInput(opts: { decimals?: Ref<number> } = {}) {
     const d = decimals.value;
     const padded = digits.value.padStart(d + 1, "0");
     const intPart = padded.slice(0, padded.length - d);
-    const fracPart = d ? "." + padded.slice(-d) : "";
+    const fracPart = d ? `.${padded.slice(-d)}` : "";
     const intFormatted = new Intl.NumberFormat("en-US").format(Number(intPart));
     return intFormatted + fracPart;
   });
@@ -40,12 +40,19 @@ export function useCurrencyInput(opts: { decimals?: Ref<number> } = {}) {
 
   function onInput(value: string | Event) {
     const raw =
-      typeof value === "string" ? value : (value.target as HTMLInputElement).value;
+      typeof value === "string"
+        ? value
+        : (value.target as HTMLInputElement).value;
     digits.value = raw.replace(/\D/g, "");
   }
 
   function setNumber(value: number | null | undefined) {
-    if (value == null || !Number.isFinite(value) || value <= 0) {
+    if (
+      value === null ||
+      value === undefined ||
+      !Number.isFinite(value) ||
+      value <= 0
+    ) {
       digits.value = "";
       return;
     }

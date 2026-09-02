@@ -44,10 +44,11 @@ interface GuestBreakdown {
 const guestsWithBreakdown = computed<GuestBreakdown[]>(() => {
   if (!check.value) return [];
 
-  const { guests, items, tax, tip, totals } = check.value;
+  const { guests, items, fees, totals } = check.value;
   const itemSubtotal = items.reduce((sum, item) => sum + item.amount, 0);
-  const extra = tax + tip;
-  const scale = itemSubtotal > 0 ? (itemSubtotal + extra) / itemSubtotal : 1;
+  const feesTotal = fees.reduce((sum, f) => sum + f.amount, 0);
+  const scale =
+    itemSubtotal > 0 ? (itemSubtotal + feesTotal) / itemSubtotal : 1;
 
   return guests.map((guest, index) => {
     const guestItems: GuestItem[] = [];
@@ -61,14 +62,14 @@ const guestsWithBreakdown = computed<GuestBreakdown[]>(() => {
     }
 
     const total = totals[guest.id] ?? 0;
-    const taxTipShare = total - rawTotal;
+    const feesShare = total - rawTotal;
 
     return {
       guest,
       displayName: guestDisplayName(guest, index),
       total,
       items: guestItems,
-      taxTipShare,
+      taxTipShare: feesShare,
     };
   });
 });
@@ -91,11 +92,13 @@ function toggleItems() {
 
 const summaryCards = computed(() => {
   if (!check.value) return [];
-  return [
+  const cards: Array<{ label: string; value: number }> = [
     { label: "Total", value: grandTotal.value },
-    { label: "Tax", value: check.value.tax },
-    { label: "Tip", value: check.value.tip },
   ];
+  for (const fee of check.value.fees) {
+    cards.push({ label: fee.label || "Fee", value: fee.amount });
+  }
+  return cards;
 });
 
 onMounted(async () => {
@@ -121,7 +124,7 @@ onMounted(async () => {
     </div>
 
     <template v-else>
-      <div class="mt-6 grid grid-cols-3 gap-3">
+      <div class="mt-6 flex flex-wrap gap-3">
         <UCard
           v-for="(summary, index) in summaryCards"
           :key="summary.label"
@@ -132,6 +135,7 @@ onMounted(async () => {
             y: 0,
             transition: { duration: 250, delay: index * 80 },
           }"
+          class="flex-1 min-w-[120px]"
         >
           <div class="flex flex-col items-center text-center">
             <span class="text-xs uppercase tracking-wide text-neutral-500">{{

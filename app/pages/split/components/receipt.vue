@@ -1,26 +1,26 @@
 <script setup lang="ts">
-import { Step, TaxTipMode } from "~/types/check";
+import { Step, FeesMode } from "~/types/check";
 
 const draft = useDraftStore();
 const flow = useSplitFlow();
 
-const taxTipMode = computed<TaxTipMode>({
-  get: () => draft.draft?.taxTipMode ?? TaxTipMode.Proportional,
+const feesMode = computed<FeesMode>({
+  get: () => draft.draft?.feesMode ?? FeesMode.Proportional,
   set: (value) => {
-    draft.setTaxTipMode(value);
+    draft.setFeesMode(value);
   },
 });
 
-const taxTipModeItems = [
+const feesModeItems = [
   {
     label: "Proportional",
-    value: TaxTipMode.Proportional,
-    description: "Split tax/tip based on each guest's share of items",
+    value: FeesMode.Proportional,
+    description: "Split fees based on each guest's share of items",
   },
   {
     label: "Equal",
-    value: TaxTipMode.Equal,
-    description: "Split tax/tip evenly across all guests",
+    value: FeesMode.Equal,
+    description: "Split fees evenly across all guests",
   },
 ];
 
@@ -37,9 +37,7 @@ const itemsSubtotal = computed(() =>
   (draft.draft?.items ?? []).reduce((sum, item) => sum + item.amount, 0)
 );
 
-const runningTotal = computed(
-  () => itemsSubtotal.value + (draft.draft?.tax ?? 0) + (draft.draft?.tip ?? 0)
-);
+const runningTotal = computed(() => itemsSubtotal.value + draft.feesTotal);
 
 function allSelected(itemId: string): boolean {
   if (!draft.draft) return false;
@@ -174,10 +172,10 @@ function onFinalize() {
           </template>
         </UCard>
 
-        <UFormField label="Tax/tip split">
+        <UFormField label="Fees split">
           <URadioGroup
-            v-model="taxTipMode"
-            :items="taxTipModeItems"
+            v-model="feesMode"
+            :items="feesModeItems"
             class="w-full"
           />
         </UFormField>

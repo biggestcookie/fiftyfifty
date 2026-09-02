@@ -6,14 +6,17 @@ const RECOGNITION_MODEL_NAME = "PP-OCRv5_mobile_rec";
 // inference.onnx + inference.yml whose model_name matches the name passed
 // below — PaddleOCR.create validates that at init.
 const DETECTION_MODEL_URL = "/models/ocr/PP-OCRv5_mobile_det_onnx_infer.tar";
-const RECOGNITION_MODEL_URL =
-  "/models/ocr/PP-OCRv5_mobile_rec_onnx_infer.tar";
+const RECOGNITION_MODEL_URL = "/models/ocr/PP-OCRv5_mobile_rec_onnx_infer.tar";
 const WASM_PATHS = "/models/ocr/wasm/";
 
 type PaddleOcrInstance = {
   predict: (input: Blob) => Promise<
     Array<{
-      items: Array<{ poly: Array<[number, number]>; text: string; score: number }>;
+      items: Array<{
+        poly: Array<[number, number]>;
+        text: string;
+        score: number;
+      }>;
     }>
   >;
 };
@@ -30,7 +33,7 @@ async function loadOcrInstance(): Promise<PaddleOcrInstance> {
     // load time, the error is captured and surfaced from warmup() rather
     // than crashing the worker chunk.
     const mod = await import("@paddleocr/paddleocr-js");
-    const PaddleOCR = mod.PaddleOCR;
+    const { PaddleOCR } = mod;
     const instance = (await PaddleOCR.create({
       // Pair each model name with its asset. PaddleOCR.create throws
       // "text_detection_model_dir requires text_detection_model_name" if an
@@ -105,13 +108,13 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
     if (req.type === "scan") {
       const instance = await loadOcrInstance();
       const results = await instance.predict(req.image);
-      const first = results[0];
-      const lines = (first?.items ?? []).map((item) => ({
+      const [first] = results;
+      const boxes = (first?.items ?? []).map((item) => ({
         text: item.text,
         score: item.score,
         box: item.poly,
       }));
-      post({ type: "scan", id: req.id, ok: true, cord: lines });
+      post({ type: "scan", id: req.id, ok: true, boxes });
       return;
     }
   } catch (e) {

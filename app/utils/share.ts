@@ -29,10 +29,21 @@ interface RequiredField {
 const REQUIRED_FIELDS: RequiredField[] = [
   { name: "guests", isValid: (value) => Array.isArray(value) },
   { name: "items", isValid: (value) => Array.isArray(value) },
-  { name: "tax", isValid: (value) => typeof value === "number" },
-  { name: "tip", isValid: (value) => typeof value === "number" },
+  {
+    name: "fees",
+    isValid: (value) =>
+      Array.isArray(value) &&
+      value.every(
+        (f) =>
+          typeof f === "object" &&
+          f !== null &&
+          typeof (f as Record<string, unknown>).label === "string" &&
+          typeof (f as Record<string, unknown>).amount === "number" &&
+          typeof (f as Record<string, unknown>).id === "string"
+      ),
+  },
   { name: "currencySymbol", isValid: (value) => typeof value === "string" },
-  { name: "taxTipMode", isValid: (value) => typeof value === "string" },
+  { name: "feesMode", isValid: (value) => typeof value === "string" },
 ];
 
 function bytesToBase64Url(bytes: Uint8Array<ArrayBuffer>): string {

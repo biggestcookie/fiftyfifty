@@ -13,10 +13,17 @@ const options: ColorModeOption[] = [
   { label: "System", value: "system", icon: "i-lucide-monitor" },
 ];
 
-const preference = computed(
+// `options` is a non-empty literal; assert via destructuring so callers
+// see `ColorModeOption` instead of `ColorModeOption | undefined`.
+const [, , fallbackOption] = options;
+if (!fallbackOption) {
+  throw new Error("ColorModeSelect: fallback option missing");
+}
+
+const preference = computed<ColorModeOption>(
   () =>
     options.find((option) => option.value === colorMode.preference) ??
-    options[2]
+    fallbackOption
 );
 
 const triggerIcon = computed(() => {

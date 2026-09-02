@@ -1,3 +1,14 @@
+/**
+ * One raw OCR box, as returned by PaddleOCR's `instance.predict()`.
+ * Boxes are 4 corners clockwise from top-left, in the image's pixel space.
+ * The composable groups these into rows before parsing.
+ */
+export interface OcrBox {
+  text: string;
+  score: number;
+  box: Array<[number, number]>;
+}
+
 export interface ProbeRequest {
   type: "probe";
   id: string;
@@ -34,7 +45,12 @@ export interface ScanResponse {
   type: "scan";
   id: string;
   ok: boolean;
-  cord?: unknown;
+  /**
+   * Raw OCR boxes from PaddleOCR, one per detected text region. The
+   * composable groups these by y-centroid into rows before handing them to
+   * `parseOcrRows()`. Always an array on success; undefined on failure.
+   */
+  boxes?: OcrBox[];
   reason?: string;
 }
 

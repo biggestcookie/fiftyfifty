@@ -4,7 +4,7 @@ export enum Step {
   Receipt = "receipt",
 }
 
-export enum TaxTipMode {
+export enum FeesMode {
   Proportional = "proportional",
   Equal = "equal",
 }
@@ -21,12 +21,17 @@ export interface Item {
   guestIds: string[];
 }
 
+export interface Fee {
+  id: string;
+  label: string;
+  amount: number;
+}
+
 export interface Draft {
   guests: Guest[];
   items: Item[];
-  tax: number;
-  tip: number;
-  taxTipMode: TaxTipMode;
+  fees: Fee[];
+  feesMode: FeesMode;
   currencySymbol: string;
   currentStep: Step;
   updatedAt: number;
