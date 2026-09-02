@@ -81,6 +81,72 @@ function onBack() {
 function onContinue() {
   flow.gotoStep(Step.Receipt);
 }
+
+const fileInput = ref<HTMLInputElement | null>(null);
+const scanPreviewUrl = ref<string | null>(null);
+const scanStatus = ref<
+  "idle" | "preparing" | "downloading" | "reading" | "done" | "error"
+>("idle");
+const cordOutput = ref<string>("");
+
+const scanner = useReceiptOcr();
+
+const isScanSupported = computed(() => scanner.isSupported.value === true);
+const scanSupportUnknown = computed(() => scanner.isSupported.value === null);
+
+const scanStatusLabel = computed(() => {
+  if (scanStatus.value === "preparing") return "Preparing scanner…";
+  if (scanStatus.value === "downloading") return "Downloading scanner…";
+  if (scanStatus.value === "reading") return "Reading receipt…";
+  if (scanStatus.value === "done") return "Receipt scanned";
+  if (scanStatus.value === "error")
+    return "Scan failed — items below unchanged";
+  return "";
+});
+
+function openFilePicker() {
+  fileInput.value?.click();
+}
+
+async function onFileSelected(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+
+  if (scanPreviewUrl.value) URL.revokeObjectURL(scanPreviewUrl.value);
+  scanPreviewUrl.value = URL.createObjectURL(file);
+  cordOutput.value = "";
+
+  scanStatus.value = "preparing";
+  try {
+    const processed = await scanner.preprocessImage(file);
+    await scanner.warmup();
+    scanStatus.value = "reading";
+    const cord = await scanner.scan(processed);
+    console.log("receipt ocr: raw lines", cord);
+    cordOutput.value = JSON.stringify(cord, null, 2);
+    // Phase 3: wire parseCordOcrOutput(cord) → replaceFromScan
+    // TODO: Phase 3 — parser
+    scanStatus.value = "done";
+  } catch (e) {
+    console.error("receipt scan failed", e);
+    scanStatus.value = "error";
+  }
+}
+
+function undoScan() {
+  draft.undoScan();
+  if (scanPreviewUrl.value) {
+    URL.revokeObjectURL(scanPreviewUrl.value);
+    scanPreviewUrl.value = null;
+  }
+  scanStatus.value = "idle";
+  cordOutput.value = "";
+}
+
+onBeforeUnmount(() => {
+  if (scanPreviewUrl.value) URL.revokeObjectURL(scanPreviewUrl.value);
+});
 </script>
 
 <template>
@@ -96,6 +162,74 @@ function onContinue() {
       </template>
 
       <div class="flex flex-col gap-6">
+        <input
+          ref="fileInput"
+          type="file"
+          accept="image/*"
+          capture="environment"
+          class="hidden"
+          @change="onFileSelected"
+        />
+
+        <UButton
+          icon="i-lucide-camera"
+          label="Scan receipt"
+          variant="soft"
+          color="primary"
+          block
+          class="min-h-[44px]"
+          :disabled="!isScanSupported"
+          :title="
+            !isScanSupported && !scanSupportUnknown
+              ? 'Scanning is not supported on this browser'
+              : undefined
+          "
+          @click="openFilePicker"
+        />
+
+        <p
+          v-if="scanner.isSupported.value === false"
+          class="text-sm text-neutral-500"
+        >
+          Receipt scanning is not supported on this browser.
+        </p>
+
+        <div
+          v-if="scanPreviewUrl"
+          class="flex flex-col items-center gap-3 rounded-md border border-neutral-200 p-4 dark:border-neutral-800"
+          role="status"
+          aria-live="polite"
+        >
+          <img
+            :src="scanPreviewUrl"
+            alt="Selected receipt"
+            class="max-h-40 rounded"
+          />
+          <div
+            v-if="scanStatus !== 'idle'"
+            class="flex w-full flex-col items-center gap-2 text-sm text-neutral-500"
+          >
+            <div class="flex items-center gap-2">
+              <UIcon
+                v-if="scanStatus === 'done'"
+                name="i-lucide-check"
+                class="h-5 w-5 text-green-500"
+                aria-hidden="true"
+              />
+              <span
+                v-else
+                class="h-4 w-4 animate-spin rounded-full border-2 border-neutral-300 border-t-primary"
+                aria-hidden="true"
+              />
+              <span>{{ scanStatusLabel }}</span>
+            </div>
+            <pre
+              v-if="scanStatus === 'done' && cordOutput"
+              class="max-h-48 w-full overflow-auto whitespace-pre-wrap break-words rounded bg-neutral-100 p-2 text-left text-xs text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
+            >{{ cordOutput }}</pre>
+          </div>
+        </div>
+
         <div
           v-if="itemCount === 0"
           class="flex flex-col items-center gap-4 py-8 text-center"
@@ -239,6 +373,18 @@ function onContinue() {
         class="sm:flex-[2]"
         :disabled="!canContinue"
         @click="onContinue"
+      />
+    </div>
+
+    <div
+      v-if="draft.canUndoScan"
+      class="mt-3 flex justify-end"
+    >
+      <UButton
+        label="Undo scan"
+        variant="link"
+        size="sm"
+        @click="undoScan"
       />
     </div>
   </div>

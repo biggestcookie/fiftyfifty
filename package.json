@@ -20,6 +20,7 @@
     "@nuxt/ui": "^4.8.2",
     "@nuxtjs/device": "4.0.0",
     "@nuxtjs/google-fonts": "3.2.0",
+    "@paddleocr/paddleocr-js": "0.4.2",
     "@pinia/nuxt": "0.11.3",
     "@vite-pwa/nuxt": "1.1.1",
     "@vueuse/motion": "^3.0.3",

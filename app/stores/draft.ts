@@ -28,16 +28,19 @@ export const useDraftStore = defineStore("draft", {
   state: () => ({
     draft: null as Draft | null,
     editingCheckId: null as string | null,
+    scanUndoSnapshot: null as Draft | null,
   }),
   getters: {
     isActive: (state) => state.draft !== null,
     guestCount: (state) => state.draft?.guests.length ?? 0,
     itemCount: (state) => state.draft?.items.length ?? 0,
+    canUndoScan: (state) => state.scanUndoSnapshot !== null,
   },
   actions: {
     start() {
       this.editingCheckId = null;
       this.draft = emptyDraft();
+      this.scanUndoSnapshot = null;
     },
 
     setStep(step: Step) {
@@ -108,6 +111,7 @@ export const useDraftStore = defineStore("draft", {
     reset() {
       this.editingCheckId = null;
       this.draft = null;
+      this.scanUndoSnapshot = null;
     },
 
     async startEditing(check: Check) {
@@ -122,6 +126,55 @@ export const useDraftStore = defineStore("draft", {
         updatedAt: Date.now(),
       };
       this.editingCheckId = check.id;
+      this.scanUndoSnapshot = null;
+    },
+
+    replaceFromScan(
+      scan: {
+        items: Array<{ label: string; amount: number }>;
+        tax: number;
+        tip: number;
+      }
+    ) {
+      if (!this.draft) return;
+      this.scanUndoSnapshot = {
+        guests: this.draft.guests.map((g) => ({ ...g })),
+        items: this.draft.items.map((i) => ({
+          ...i,
+          guestIds: [...i.guestIds],
+        })),
+        tax: this.draft.tax,
+        tip: this.draft.tip,
+        taxTipMode: this.draft.taxTipMode,
+        currencySymbol: this.draft.currencySymbol,
+        currentStep: this.draft.currentStep,
+        updatedAt: this.draft.updatedAt,
+      };
+      this.draft.items = scan.items.map((item) => ({
+        id: crypto.randomUUID(),
+        label: item.label,
+        amount: item.amount,
+        guestIds: [],
+      }));
+      this.draft.tax = scan.tax;
+      this.draft.tip = scan.tip;
+      this.draft.updatedAt = Date.now();
+    },
+
+    undoScan() {
+      if (!this.draft || !this.scanUndoSnapshot) return;
+      const snapshot = this.scanUndoSnapshot;
+      this.draft.items = snapshot.items.map((i) => ({
+        ...i,
+        guestIds: [...i.guestIds],
+      }));
+      this.draft.tax = snapshot.tax;
+      this.draft.tip = snapshot.tip;
+      this.scanUndoSnapshot = null;
+    },
+
+    clearScanUndo() {
+      this.scanUndoSnapshot = null;
     },
 
     async finalize(): Promise<Check | null> {

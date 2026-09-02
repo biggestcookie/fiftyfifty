@@ -53,6 +53,26 @@ export default defineNuxtConfig({
         },
       },
     },
+    resolve: {
+      alias: [],
+    },
+    optimizeDeps: {
+      include: [
+        "@vue/devtools-core",
+        "@vue/devtools-kit",
+        "idb",
+        // PaddleOCR SDK pulls in several legacy UMD bundles. Pre-bundle them
+        // as CJS so Vite's interop provides synthetic default exports.
+        "@techstark/opencv-js",
+        "clipper-lib",
+        "js-yaml",
+      ],
+      // @paddleocr/paddleocr-js and onnxruntime-web use
+      // `new URL(..., import.meta.url)` patterns that crash Vite's
+      // pre-bundler with "Maximum call stack size exceeded". Exclude them
+      // so they're loaded at runtime in the worker instead.
+      exclude: ["@paddleocr/paddleocr-js", "onnxruntime-web"],
+    },
     plugins: [
       {
         name: "vite-plugin-ignore-sourcemap-warnings",
@@ -67,6 +87,30 @@ export default defineNuxtConfig({
             }
 
             warn(warning);
+          };
+        },
+      },
+      // @paddleocr/paddleocr-js's default worker factory uses
+      //   new URL("./assets/worker-entry-*.js", import.meta.url)
+      // which Vite's [plugin:vite:asset-import-meta-url] recurses into until
+      // it overflows the stack. We always pass our own `createWorker`
+      // (see app/workers/ocr.worker.ts), so this branch is dead code at
+      // runtime — replace the URL pattern with a hardcoded path to the
+      // self-hosted copy of the SDK's worker-entry so Vite's static
+      // analyzer skips it entirely. The runtime path is the same either way.
+      {
+        name: "patch-paddleocr-worker-entry-url",
+        enforce: "pre",
+        transform(code, id) {
+          if (!id.includes("@paddleocr/paddleocr-js/dist/index.mjs")) return;
+          const before =
+            'const _w = new URL("./assets/worker-entry-C9UNuyOJ.js", import.meta.url);';
+          const after =
+            'const _w = "/models/ocr/paddleocr-worker-entry.mjs";';
+          if (!code.includes(before)) return;
+          return {
+            code: code.replace(before, after),
+            map: null,
           };
         },
       },
@@ -124,6 +168,18 @@ export default defineNuxtConfig({
             cacheName: "pages",
             networkTimeoutSeconds: 1,
             expiration: { maxEntries: 1 },
+          },
+        },
+        // Self-hosted PP-OCRv5 model tars and ORT wasm under /models/ocr/.
+        // Fetched on first scan and cached for a year; not in the install-time
+        // precache so the PWA install stays small.
+        {
+          urlPattern: /\/models\/ocr\/.*/i,
+          handler: "CacheFirst",
+          options: {
+            cacheName: "ocr-models",
+            expiration: { maxEntries: 8, maxAgeSeconds: 60 * 60 * 24 * 365 },
+            cacheableResponse: { statuses: [0, 200] },
           },
         },
       ],
