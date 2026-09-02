@@ -64,13 +64,14 @@ const TOTAL_RE = /\btotal\b/i;
 
 /**
  * Structural cleanup (strip leading quantity digit, trailing noise) +
- * digit strip + OCR confusable swap (0↔o, 1→l, 5→s, 8→b, trailing t/T→l).
+ * contextual OCR confusable swap (0↔o, 1→l, 5→s, 8→b, trailing t/T→l).
  *
  * Order matters: the structural strip runs first (so "1 Iced Tea 3.00"
- * produces "Iced Tea" before we touch characters), then digit strip
- * (which removes leftover digits so the 1→l swap doesn't re-introduce
- * letters in their place — e.g. "EgLs1" → strip `1` → "EgLs", not
- * "EgLsl"), then the confusable swap.
+ * produces "Iced Tea" before we touch characters), then the confusable
+ * swap. No blanket digit strip — after price extraction, remaining digits
+ * are either legitimate item content ("12OZ", "2X") that must survive, or
+ * OCR-confusable digits that should be letters ("ST1LL" → "STILL") that
+ * the swap fixes.
  *
  * Applied to the *displayed* label so the user sees "Egusi" instead of
  * "EgLs1", "Still" instead of "Stil1". (We can't recover OCR's `u→Ls`
@@ -83,13 +84,13 @@ function cleanLabel(raw: string): string {
     .replace(/[\s.]+$/, "")
     .replace(/\*+$/, "")
     .trim();
-  // Digit strip BEFORE the confusable swap so `1` is dropped instead of
-  // converted to `l`. Both pass-1 and pass-2 digits are caught.
-  label = label.replace(/\d+/g, "");
+  // Confusable swap only — the blanket digit strip is gone, so legit item
+  // digits ("12OZ", "2X", "V8") are preserved. `5(?=[a-zA-Z])` covers
+  // all-caps receipt labels as well as mixed case.
   label = label
     .replace(/0/g, "o")
     .replace(/1/g, "l")
-    .replace(/5(?=[a-z])/g, "s")
+    .replace(/5(?=[a-zA-Z])/g, "s")
     .replace(/8/g, "b")
     .replace(/[tT]$/, "l"); // case-insensitive trailing t/T (OCR misreads `l` as `T`)
   label = label.replace(/\s+/g, " ").trim();
@@ -99,6 +100,52 @@ function cleanLabel(raw: string): string {
 /** Lower-case variant of `cleanLabel` for keyword matching. */
 function normalizeForMatch(label: string): string {
   return label.toLowerCase();
+}
+
+/**
+ * Try to repair a token that was almost-but-not-quite a price. Returns the
+ * repaired string if it matches the price regex, else null. Applied to
+ * numeric context, so letter↔digit confusables are resolved in the digit
+ * direction (O→0, l→1, etc.).
+ */
+const NUMERIC_CONFUSABLES: Record<string, string> = {
+  O: "0", o: "0", D: "0",
+  I: "1", l: "1", "|": "1",
+  Z: "2", z: "2",
+  S: "5", s: "5",
+  G: "6", b: "6",
+  B: "8",
+  q: "9", g: "9",
+};
+
+export function repairPriceToken(token: string, useEuropean: boolean): string | null {
+  const re = useEuropean ? /^\$?\d+,\d{1,2}$/ : /^\$?\d+\.\d{1,2}$/;
+  if (re.test(token)) return token;
+
+  // Pass 1: every confusable → digit
+  let repaired = "";
+  for (const ch of token) {
+    repaired += NUMERIC_CONFUSABLES[ch] ?? ch;
+  }
+  if (re.test(repaired)) return repaired;
+
+  // Pass 2: strip internal whitespace
+  const stripped = repaired.replace(/\s+/g, "");
+  if (re.test(stripped)) return stripped;
+
+  // Pass 3: brute-force single-character edit, length 3-10 only
+  if (stripped.length >= 3 && stripped.length <= 10) {
+    for (let i = 0; i < stripped.length; i++) {
+      const ch = stripped[i];
+      if (ch === "$" || ch === "." || ch === "," || ch === "-") continue;
+      for (let d = 0; d <= 9; d++) {
+        const candidate = stripped.slice(0, i) + d + stripped.slice(i + 1);
+        if (re.test(candidate)) return candidate;
+      }
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -126,7 +173,12 @@ export function parseOcrRows(rows: OcrLine[]): ParsedReceipt {
     const tokens = row.text.trim().split(/\s+/).filter(Boolean);
     if (tokens.length === 0) continue;
 
-    // Rule 1: pull the rightmost price-shaped token.
+    // Rule 1: pull the rightmost price-shaped token. First pass tries the
+    // direct regex matches (rightmost wins, existing behavior). On a miss,
+    // attempt to repair near-miss tokens right-to-left — numeric context
+    // only, pure-letter tokens like "TOTAL" are skipped. The first
+    // successful repair is substituted back into `tokens` so the label pass
+    // below doesn't accidentally include a now-price token as label content.
     let priceIdx = -1;
     let price = 0;
     for (let i = tokens.length - 1; i >= 0; i--) {
@@ -135,6 +187,19 @@ export function parseOcrRows(rows: OcrLine[]): ParsedReceipt {
         priceIdx = i;
         price = parsePrice(tok);
         break;
+      }
+    }
+    if (priceIdx === -1) {
+      for (let i = tokens.length - 1; i >= 0; i--) {
+        const tok = tokens[i] ?? "";
+        if (!/\d/.test(tok)) continue; // skip pure-letter tokens
+        const repaired = repairPriceToken(tok, useEuropean);
+        if (repaired !== null) {
+          tokens[i] = repaired;
+          priceIdx = i;
+          price = parsePrice(repaired);
+          break;
+        }
       }
     }
     if (priceIdx === -1) {

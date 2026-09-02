@@ -202,9 +202,13 @@ async function onFileSelected(event: Event) {
 
   const items = draft.draft?.items ?? [];
   const fees = draft.draft?.fees ?? [];
+  // "User content" = a non-zero amount the user has actually entered. The
+  // default draft ships with two zero-amount fee rows (Tax, Tip) so the
+  // labels alone are not a reliable signal — a non-zero amount is what
+  // means the user committed to something we'd be discarding on rescan.
   const hasUserContent =
-    items.some((i) => i.label.trim().length > 0 || i.amount > 0) ||
-    fees.some((f) => f.label.trim().length > 0 || f.amount > 0);
+    items.some((i) => i.amount > 0) ||
+    fees.some((f) => f.amount > 0);
   if (hasUserContent) {
     const ok = window.confirm(
       "Scanning will replace your current items and fees. Continue?"

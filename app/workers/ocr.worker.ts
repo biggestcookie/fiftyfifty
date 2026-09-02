@@ -10,7 +10,10 @@ const RECOGNITION_MODEL_URL = "/models/ocr/PP-OCRv5_mobile_rec_onnx_infer.tar";
 const WASM_PATHS = "/models/ocr/wasm/";
 
 type PaddleOcrInstance = {
-  predict: (input: Blob) => Promise<
+  predict: (
+    input: Blob,
+    options?: { textDetUnclipRatio?: number; textRecScoreThresh?: number }
+  ) => Promise<
     Array<{
       items: Array<{
         poly: Array<[number, number]>;
@@ -107,7 +110,17 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
 
     if (req.type === "scan") {
       const instance = await loadOcrInstance();
-      const results = await instance.predict(req.image);
+      const results = await instance.predict(req.image, {
+        // Thermal-print tuned params. textDetUnclipRatio is dropped from
+        // the SDK default 2.0 → 1.5 to stop adjacent receipt lines from
+        // merging into one box. textRecScoreThresh is kept at the demo
+        // default 0.1 — raising it to 0.5 dropped every line on real
+        // receipts because per-line CTC confidence is already low (0.3-0.6)
+        // for faded thermal print; the parser's repair pass handles the
+        // garbled text that the low threshold lets through.
+        textDetUnclipRatio: 1.5,
+        textRecScoreThresh: 0.1,
+      });
       const [first] = results;
       const boxes = (first?.items ?? []).map((item) => ({
         text: item.text,
