@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Step } from "~/types/check";
+import { Step, PaymentMethod } from "~/types/check";
 
 const draft = useDraftStore();
 const flow = useSplitFlow();
@@ -28,6 +28,93 @@ function incrementGuests() {
 function decrementGuests() {
   if (!draft.draft) return;
   draft.setGuestCount(Math.max(0, draft.guestCount - 1));
+}
+
+const paymentMethod = computed<PaymentMethod>(
+  () => draft.draft?.paymentMethod ?? PaymentMethod.None
+);
+
+const paymentHandle = computed<string>({
+  get: () => draft.draft?.paymentHandle ?? "",
+  set: (value) => {
+    draft.setPaymentHandle(value);
+  },
+});
+
+function paymentMethodLabel(value: PaymentMethod): string {
+  switch (value) {
+    case PaymentMethod.Venmo:
+      return "Venmo";
+    case PaymentMethod.Zelle:
+      return "Zelle";
+    default:
+      return "None";
+  }
+}
+
+/**
+ * Checkbox-style items drive selection from each item's
+ * `onUpdateChecked` — the project-wide pattern used by the currency and
+ * color-mode selectors.
+ */
+const paymentMethodItems = computed(() =>
+  ([PaymentMethod.None, PaymentMethod.Venmo, PaymentMethod.Zelle] as const).map(
+    (value) => ({
+      label: paymentMethodLabel(value),
+      value,
+      type: "checkbox" as const,
+      checked: paymentMethod.value === value,
+      onUpdateChecked: (checked: boolean) => {
+        if (!checked) return;
+        draft.setPaymentMethod(value);
+      },
+    })
+  )
+);
+
+const paymentHandlePlaceholder = computed(() => {
+  switch (paymentMethod.value) {
+    case PaymentMethod.Venmo:
+      return "Venmo username (no @)";
+    case PaymentMethod.Zelle:
+      return "Email or phone on Zelle";
+    default:
+      return "";
+  }
+});
+
+const paymentHandleHelp = computed(() => {
+  switch (paymentMethod.value) {
+    case PaymentMethod.Venmo:
+      return "Friends tap your Venmo button on the final check.";
+    case PaymentMethod.Zelle:
+      return "Friends see this on the final check and pay you through their bank.";
+    default:
+      return "";
+  }
+});
+
+const showPaymentFields = computed(
+  () => paymentMethod.value !== PaymentMethod.None
+);
+
+/**
+ * Hyphen is escaped because browsers compile `<input pattern>` under the
+ * `v` (unicodeSets) flag, where an unescaped `-` between two chars is
+ * parsed as a range — `_-` would otherwise be an invalid range.
+ */
+const venmoPattern = computed(() =>
+  paymentMethod.value === PaymentMethod.Venmo ? "[A-Za-z0-9_\\-]+" : undefined
+);
+
+function onHandleInput(event: Event) {
+  if (paymentMethod.value !== PaymentMethod.Venmo) return;
+  const target = event.target as HTMLInputElement;
+  const cleaned = target.value.replace(/[^A-Za-z0-9_-]/g, "");
+  if (cleaned !== target.value) {
+    target.value = cleaned;
+    paymentHandle.value = cleaned;
+  }
 }
 </script>
 
@@ -85,6 +172,41 @@ function decrementGuests() {
               :placeholder="`Guest ${String.fromCharCode(65 + index)}`"
               class="w-full"
               @update:model-value="updateGuestName(guest.id, $event as string)"
+            />
+          </UFormField>
+        </div>
+
+        <div class="flex flex-col gap-4 border-t border-neutral-200 pt-6 dark:border-neutral-800">
+          <UFormField
+            label="Where should they pay you?"
+            help="Optional — shown on the final check so friends can tap to pay."
+          >
+            <UDropdownMenu :items="paymentMethodItems" :ui="{ content: 'min-w-[12rem]' }">
+              <UButton
+                :label="paymentMethodLabel(paymentMethod)"
+                color="neutral"
+                variant="outline"
+                block
+                trailing-icon="i-lucide-chevron-down"
+                class="min-h-[44px] justify-between"
+              />
+            </UDropdownMenu>
+          </UFormField>
+
+          <UFormField
+            v-if="showPaymentFields"
+            :label="paymentMethod === PaymentMethod.Venmo ? 'Venmo username' : 'Zelle contact'"
+            :help="paymentHandleHelp"
+          >
+            <UInput
+              v-model="paymentHandle"
+              :placeholder="paymentHandlePlaceholder"
+              :pattern="venmoPattern"
+              :inputmode="paymentMethod === PaymentMethod.Venmo ? 'text' : 'email'"
+              :type="paymentMethod === PaymentMethod.Venmo ? 'text' : 'email'"
+              class="w-full"
+              autocomplete="off"
+              @input="onHandleInput"
             />
           </UFormField>
         </div>

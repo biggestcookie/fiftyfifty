@@ -9,6 +9,12 @@ export enum FeesMode {
   Equal = "equal",
 }
 
+export enum PaymentMethod {
+  None = "none",
+  Venmo = "venmo",
+  Zelle = "zelle",
+}
+
 export interface Guest {
   id: string;
   name?: string;
@@ -35,6 +41,16 @@ export interface Draft {
   currencySymbol: string;
   currentStep: Step;
   updatedAt: number;
+  /**
+   * Where the check owner wants to receive payment. Optional so older
+   * checks (and existing IndexedDB rows) keep working unchanged.
+   */
+  paymentMethod?: PaymentMethod;
+  /**
+   * Venmo username (without the "@") or Zelle email/phone. Only meaningful
+   * when `paymentMethod` is set.
+   */
+  paymentHandle?: string;
 }
 
 export interface Check extends Draft {

@@ -342,7 +342,6 @@ onBeforeUnmount(() => {
         >
           <UButton
             icon="i-lucide-camera"
-            label="Scan receipt"
             variant="soft"
             color="primary"
             block
@@ -355,7 +354,14 @@ onBeforeUnmount(() => {
             "
             trailing-icon="i-lucide-chevron-down"
             aria-label="Scan receipt"
-          />
+          >
+            <span class="flex flex-col items-start">
+              <span>Scan receipt</span>
+              <span class="text-xs font-normal text-neutral-500 dark:text-neutral-400">
+                Scanned on this device — your receipt never leaves your phone.
+              </span>
+            </span>
+          </UButton>
         </UDropdownMenu>
 
         <div
@@ -363,9 +369,6 @@ onBeforeUnmount(() => {
           class="text-center text-sm text-neutral-500"
         >
           <p>Scan a receipt to fill in items automatically.</p>
-          <p class="mt-1 text-xs">
-            Scanned on-device — your receipt never leaves your phone.
-          </p>
         </div>
 
         <p

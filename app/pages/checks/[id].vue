@@ -1,5 +1,11 @@
 <script setup lang="ts">
 import type { Check, Guest, Item } from "~/types/check";
+import { PaymentMethod } from "~/types/check";
+import {
+  isPaymentConfigured,
+  openVenmoWithFallback,
+  tryZelleScheme,
+} from "~/utils/payment";
 
 const route = useRoute();
 const router = useRouter();
@@ -101,6 +107,53 @@ const summaryCards = computed(() => {
   return cards;
 });
 
+const hasPayment = computed(() =>
+  isPaymentConfigured(
+    check.value?.paymentMethod,
+    check.value?.paymentHandle
+  )
+);
+
+const paymentNote = computed(() => {
+  if (!check.value) return "";
+  return checkName(check.value);
+});
+
+function onPayVenmo() {
+  if (!check.value || !check.value.paymentHandle) return;
+  void openVenmoWithFallback(
+    check.value.paymentHandle,
+    grandTotal.value,
+    paymentNote.value
+  );
+}
+
+const zelleModalOpen = ref(false);
+
+async function onPayZelle() {
+  if (!check.value?.paymentHandle) return;
+  const opened = await tryZelleScheme(check.value.paymentHandle);
+  if (opened) return;
+  await copyZelleHandle();
+  zelleModalOpen.value = true;
+}
+
+const handleCopied = ref(false);
+
+async function copyZelleHandle() {
+  if (!check.value?.paymentHandle) return;
+  try {
+    await navigator.clipboard.writeText(check.value.paymentHandle);
+    handleCopied.value = true;
+    window.setTimeout(() => {
+      handleCopied.value = false;
+    }, 2000);
+  } catch {
+    // Clipboard may be unavailable; the modal shows the handle inline so
+    // the user can copy manually if needed.
+  }
+}
+
 onMounted(async () => {
   const { id } = route.params;
   const loaded = await checkStore.loadById(typeof id === "string" ? id : "");
@@ -190,6 +243,93 @@ onMounted(async () => {
           </li>
         </ul>
       </UCard>
+
+      <UCard
+        v-if="hasPayment && check.paymentMethod === PaymentMethod.Venmo"
+        v-motion
+        :initial="{ opacity: 0, y: 12 }"
+        :enter="{ opacity: 1, y: 0, transition: { duration: 250, delay: 280 } }"
+        class="mt-4"
+      >
+        <div class="flex flex-col items-center gap-3 text-center">
+          <span class="text-sm text-neutral-500">
+            Total to send
+          </span>
+          <span class="text-2xl font-semibold">
+            {{ formatCurrency(grandTotal, check.currencySymbol) }}
+          </span>
+          <UButton
+            label="Pay on Venmo"
+            icon="i-lucide-send"
+            color="primary"
+            size="lg"
+            block
+            class="min-h-[44px] mt-2"
+            @click="onPayVenmo"
+          />
+        </div>
+      </UCard>
+
+      <UCard
+        v-else-if="hasPayment && check.paymentMethod === PaymentMethod.Zelle"
+        v-motion
+        :initial="{ opacity: 0, y: 12 }"
+        :enter="{ opacity: 1, y: 0, transition: { duration: 250, delay: 280 } }"
+        class="mt-4"
+      >
+        <div class="flex flex-col items-center gap-3 text-center">
+          <span class="text-sm text-neutral-500">Send via Zelle</span>
+          <span class="text-2xl font-semibold">
+            {{ formatCurrency(grandTotal, check.currencySymbol) }}
+          </span>
+          <code
+            class="rounded-md bg-neutral-100 px-3 py-2 text-base font-mono break-all dark:bg-neutral-800"
+            data-testid="zelle-handle"
+          >
+            {{ check.paymentHandle }}
+          </code>
+          <UButton
+            label="Send via Zelle"
+            icon="i-lucide-send"
+            color="primary"
+            size="lg"
+            block
+            class="min-h-[44px] mt-2"
+            @click="onPayZelle"
+          />
+        </div>
+      </UCard>
+
+      <UModal
+        v-model:open="zelleModalOpen"
+        title="Couldn't open Zelle link"
+      >
+        <template #body>
+          <div class="flex flex-col gap-3">
+            <p class="text-sm text-neutral-600 dark:text-neutral-400">
+              Copied <code class="font-mono">{{ check?.paymentHandle }}</code>
+              to clipboard — open your banking app and paste it into Zelle's
+              "Send" field.
+            </p>
+          </div>
+        </template>
+        <template #footer>
+          <div class="flex justify-end gap-2">
+            <UButton
+              :label="handleCopied ? 'Copied!' : 'Copy again'"
+              :icon="handleCopied ? 'i-lucide-check' : 'i-lucide-copy'"
+              color="neutral"
+              variant="outline"
+              @click="copyZelleHandle"
+            />
+            <UButton
+              label="Done"
+              color="primary"
+              @click="zelleModalOpen = false"
+            />
+          </div>
+        </template>
+      </UModal>
 
       <div
         v-motion
