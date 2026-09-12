@@ -46,11 +46,7 @@ interface GuestBreakdown {
 const guestsWithBreakdown = computed<GuestBreakdown[]>(() => {
   if (!check.value) return [];
 
-  const { guests, items, fees, totals } = check.value;
-  const itemSubtotal = items.reduce((sum, item) => sum + item.amount, 0);
-  const feesTotal = fees.reduce((sum, f) => sum + f.amount, 0);
-  const scale =
-    itemSubtotal > 0 ? (itemSubtotal + feesTotal) / itemSubtotal : 1;
+  const { guests, items, totals } = check.value;
 
   return guests.map((guest, index) => {
     const guestItems: GuestItem[] = [];
@@ -58,9 +54,9 @@ const guestsWithBreakdown = computed<GuestBreakdown[]>(() => {
 
     for (const item of items) {
       if (!item.guestIds.includes(guest.id)) continue;
-      const share = (item.amount * scale) / item.guestIds.length;
+      const share = item.amount / item.guestIds.length;
       guestItems.push({ item, share });
-      rawTotal += item.amount / item.guestIds.length;
+      rawTotal += share;
     }
 
     const total = totals[guest.id] ?? 0;
@@ -231,6 +227,8 @@ onMounted(async () => {
     return;
   }
   check.value = loaded;
+  // eslint-disable-next-line no-console
+  console.log("[CHECK_RECEIPT]", JSON.stringify(loaded, null, 2));
 });
 </script>
 

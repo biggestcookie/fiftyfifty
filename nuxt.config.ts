@@ -25,6 +25,21 @@ export default defineNuxtConfig({
     baseURL: "/",
     pageTransition: { name: "page", mode: "out-in" },
     layoutTransition: { name: "layout", mode: "out-in" },
+    head: {
+      title: "Split this check with me!",
+      meta: [
+        { charset: "utf-8" },
+        { name: "viewport", content: "width=device-width, initial-scale=1" },
+        { name: "description", content: "FiftyFifty" },
+        { property: "og:type", content: "website" },
+        { property: "og:site_name", content: "FiftyFifty" },
+        { property: "og:title", content: "Split this check with me!" },
+        { property: "og:description", content: "FiftyFifty" },
+        { name: "twitter:card", content: "summary" },
+        { name: "twitter:title", content: "Split this check with me!" },
+        { name: "twitter:description", content: "FiftyFifty" },
+      ],
+    },
   },
   nitro: {
     preset: "netlify",
