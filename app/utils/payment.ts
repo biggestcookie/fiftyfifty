@@ -1,5 +1,3 @@
-import { PaymentMethod } from "~/types/check";
-
 /**
  * Navigate to a custom URL scheme (e.g. `venmo://...`) on mobile and wait
  * up to `timeoutMs` to see if the native app stole focus. On desktop
@@ -73,9 +71,11 @@ export function venmoWebUrl(
   note: string
 ): string {
   const cleanHandle = encodeURIComponent(handle.replace(/^@/, "").trim());
+  // Recipient is in the path, no need to repeat it as a `recipients` param
+  // — Venmo's `/payment-link` page has been observed to surface the
+  // recipient twice in the URL bar when the same value appears in both.
   const params = new URLSearchParams({
     txn: "pay",
-    recipients: cleanHandle,
     amount: amount.toFixed(2),
     note,
   });
@@ -90,7 +90,6 @@ export function venmoAppUrl(
   const cleanHandle = encodeURIComponent(handle.replace(/^@/, "").trim());
   const params = new URLSearchParams({
     txn: "pay",
-    recipients: cleanHandle,
     amount: amount.toFixed(2),
     note,
   });
@@ -99,16 +98,4 @@ export function venmoAppUrl(
 
 export function zelleAppUrl(handle: string): string {
   return `zelle://pay?recipient=${encodeURIComponent(handle.trim())}`;
-}
-
-export function isPaymentConfigured(
-  method: PaymentMethod | undefined,
-  handle: string | undefined
-): method is PaymentMethod.Venmo | PaymentMethod.Zelle {
-  return (
-    method !== undefined &&
-    method !== PaymentMethod.None &&
-    !!handle &&
-    handle.trim().length > 0
-  );
 }

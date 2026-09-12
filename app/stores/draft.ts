@@ -2,7 +2,6 @@ import { defineStore } from "pinia";
 import {
   Step,
   FeesMode,
-  PaymentMethod,
   type Draft,
   type Check,
   type Fee,
@@ -114,32 +113,18 @@ export const useDraftStore = defineStore("draft", {
      * preserved when switching methods so the user doesn't have to retype
      * it just to toggle Venmo <-> Zelle.
      */
-    setPaymentMethod(method: PaymentMethod) {
-      if (!this.draft) return;
-      if (method === PaymentMethod.None) {
-        delete this.draft.paymentMethod;
-        delete this.draft.paymentHandle;
-      } else {
-        this.draft.paymentMethod = method;
-      }
-    },
-
-    /**
-     * Set the payment handle. Treats a blank value as "no payment
-     * configured" so a half-cleared input can't leave a stale handle
-     * attached to a method.
-     */
-    setPaymentHandle(handle: string) {
+    setVenmoHandle(handle: string) {
       if (!this.draft) return;
       const trimmed = handle.trim();
-      if (trimmed === "") {
-        delete this.draft.paymentHandle;
-        if (this.draft.paymentMethod !== undefined) {
-          delete this.draft.paymentMethod;
-        }
-      } else {
-        this.draft.paymentHandle = trimmed;
-      }
+      if (trimmed === "") delete this.draft.venmoHandle;
+      else this.draft.venmoHandle = trimmed;
+    },
+
+    setZelleHandle(handle: string) {
+      if (!this.draft) return;
+      const trimmed = handle.trim();
+      if (trimmed === "") delete this.draft.zelleHandle;
+      else this.draft.zelleHandle = trimmed;
     },
 
     toggleItemGuest(itemId: string, guestId: string) {
@@ -171,8 +156,8 @@ export const useDraftStore = defineStore("draft", {
         currencySymbol: check.currencySymbol,
         currentStep: Step.Guests, // resume at the start of the flow so user can review guests/items
         updatedAt: Date.now(),
-        paymentMethod: check.paymentMethod,
-        paymentHandle: check.paymentHandle,
+        venmoHandle: check.venmoHandle,
+        zelleHandle: check.zelleHandle,
       };
       this.editingCheckId = check.id;
       this.scanUndoSnapshot = null;
@@ -194,8 +179,8 @@ export const useDraftStore = defineStore("draft", {
         currencySymbol: this.draft.currencySymbol,
         currentStep: this.draft.currentStep,
         updatedAt: this.draft.updatedAt,
-        paymentMethod: this.draft.paymentMethod,
-        paymentHandle: this.draft.paymentHandle,
+        venmoHandle: this.draft.venmoHandle,
+        zelleHandle: this.draft.zelleHandle,
       };
       this.draft.items = scan.items.map((item) => ({
         id: crypto.randomUUID(),
@@ -279,23 +264,8 @@ export const useDraftStore = defineStore("draft", {
         currentStep: Step.Receipt,
         updatedAt: Date.now(),
         totals,
-        // Both fields use the same guard so a method-only state (method
-        // set, handle empty) can't reach the final page as a broken
-        // payment button.
-        paymentMethod:
-          d.paymentMethod !== undefined &&
-          d.paymentMethod !== PaymentMethod.None &&
-          d.paymentHandle !== undefined &&
-          d.paymentHandle !== ""
-            ? d.paymentMethod
-            : undefined,
-        paymentHandle:
-          d.paymentMethod !== undefined &&
-          d.paymentMethod !== PaymentMethod.None &&
-          d.paymentHandle !== undefined &&
-          d.paymentHandle !== ""
-            ? d.paymentHandle
-            : undefined,
+        venmoHandle: d.venmoHandle,
+        zelleHandle: d.zelleHandle,
       };
 
       await checkStore.add(check);

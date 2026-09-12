@@ -1,11 +1,7 @@
 <script setup lang="ts">
 import type { Check, Guest, Item } from "~/types/check";
-import { PaymentMethod } from "~/types/check";
-import {
-  isPaymentConfigured,
-  openVenmoWithFallback,
-  tryZelleScheme,
-} from "~/utils/payment";
+import { openVenmoWithFallback, tryZelleScheme } from "~/utils/payment";
+import { formatZelleHandle } from "~/utils/zelle";
 
 const route = useRoute();
 const router = useRouter();
@@ -96,61 +92,134 @@ function toggleItems() {
   itemsExpanded.value = !itemsExpanded.value;
 }
 
-const summaryCards = computed(() => {
+/** Items + fees shown in the receipt dropdown. */
+const receiptEntries = computed(() => {
   if (!check.value) return [];
-  const cards: Array<{ label: string; value: number }> = [
-    { label: "Total", value: grandTotal.value },
+  return [
+    ...check.value.items.map((item) => ({
+      key: item.id,
+      label: item.label || "Unnamed item",
+      amount: item.amount,
+    })),
+    ...check.value.fees.map((fee) => ({
+      key: `fee-${fee.id}`,
+      label: fee.label || "Fee",
+      amount: fee.amount,
+    })),
   ];
-  for (const fee of check.value.fees) {
-    cards.push({ label: fee.label || "Fee", value: fee.amount });
-  }
-  return cards;
 });
 
-const hasPayment = computed(() =>
-  isPaymentConfigured(
-    check.value?.paymentMethod,
-    check.value?.paymentHandle
-  )
+const hasVenmo = computed(() => !!check.value?.venmoHandle);
+const hasZelle = computed(() => !!check.value?.zelleHandle);
+const formattedZelle = computed(() =>
+  check.value?.zelleHandle ? formatZelleHandle(check.value.zelleHandle) : ""
 );
+
+/** "Who are you paying for?" modal state. */
+type PaymentMethodKey = "venmo" | "zelle";
+const paymentModalOpen = ref(false);
+const paymentModalMethod = ref<PaymentMethodKey | null>(null);
+const selectedGuestIds = ref<Set<string>>(new Set());
+/**
+ * When the Zelle scheme fails on mobile, the modal flips from the guest
+ * selection view to a "copied to clipboard" view rather than opening a
+ * second modal. `null` means the selection view is showing.
+ */
+const zelleCopyState = ref(false);
+
+function openPaymentModal(method: PaymentMethodKey) {
+  if (!check.value) return;
+  paymentModalMethod.value = method;
+  selectedGuestIds.value = new Set();
+  zelleCopyState.value = false;
+  handleCopied.value = false;
+  paymentModalOpen.value = true;
+}
+
+const selectedTotal = computed(() => {
+  if (!check.value) return 0;
+  let sum = 0;
+  for (const breakdown of guestsWithBreakdown.value) {
+    if (selectedGuestIds.value.has(breakdown.guest.id)) {
+      sum += breakdown.total;
+    }
+  }
+  return sum;
+});
+
+function toggleGuestSelected(id: string) {
+  const next = new Set(selectedGuestIds.value);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  selectedGuestIds.value = next;
+}
+
+const canConfirmPay = computed(() => selectedTotal.value > 0);
 
 const paymentNote = computed(() => {
   if (!check.value) return "";
-  return checkName(check.value);
+  const labels = new Set<string>();
+  for (const breakdown of guestsWithBreakdown.value) {
+    if (!selectedGuestIds.value.has(breakdown.guest.id)) continue;
+    for (const guestItem of breakdown.items) {
+      labels.add(guestItem.item.label || "Unnamed item");
+    }
+  }
+  if (labels.size === 0) return checkName(check.value);
+  return Array.from(labels).join(", ");
+});
+
+const payButtonLabel = computed(() => {
+  if (!check.value) return "";
+  const amount = formatCurrency(selectedTotal.value, check.value.currencySymbol);
+  if (paymentModalMethod.value === "venmo" && check.value.venmoHandle) {
+    return `Pay ${amount} to ${check.value.venmoHandle} on Venmo`;
+  }
+  if (paymentModalMethod.value === "zelle" && formattedZelle.value) {
+    return `Pay ${amount} to ${formattedZelle.value} on Zelle`;
+  }
+  return "";
 });
 
 function onPayVenmo() {
-  if (!check.value || !check.value.paymentHandle) return;
-  void openVenmoWithFallback(
-    check.value.paymentHandle,
-    grandTotal.value,
-    paymentNote.value
-  );
+  if (!check.value?.venmoHandle) return;
+  openPaymentModal("venmo");
 }
 
-const zelleModalOpen = ref(false);
+function onPayZelle() {
+  if (!check.value?.zelleHandle) return;
+  openPaymentModal("zelle");
+}
 
-async function onPayZelle() {
-  if (!check.value?.paymentHandle) return;
-  const opened = await tryZelleScheme(check.value.paymentHandle);
-  if (opened) return;
-  await copyZelleHandle();
-  zelleModalOpen.value = true;
+async function onConfirmPay() {
+  if (!check.value || !canConfirmPay.value) return;
+  if (paymentModalMethod.value === "venmo" && check.value.venmoHandle) {
+    await openVenmoWithFallback(
+      check.value.venmoHandle,
+      selectedTotal.value,
+      paymentNote.value
+    );
+  } else if (paymentModalMethod.value === "zelle" && check.value.zelleHandle) {
+    const opened = await tryZelleScheme(check.value.zelleHandle);
+    if (opened) return;
+    await copyZelleHandle();
+    zelleCopyState.value = true;
+  }
 }
 
 const handleCopied = ref(false);
 
 async function copyZelleHandle() {
-  if (!check.value?.paymentHandle) return;
+  if (!check.value?.zelleHandle) return;
   try {
-    await navigator.clipboard.writeText(check.value.paymentHandle);
+    await navigator.clipboard.writeText(check.value.zelleHandle);
     handleCopied.value = true;
     window.setTimeout(() => {
       handleCopied.value = false;
     }, 2000);
   } catch {
-    // Clipboard may be unavailable; the modal shows the handle inline so
-    // the user can copy manually if needed.
+    // Clipboard may be unavailable; the modal still shows the handle
+    // inline so the user can copy manually if needed.
   }
 }
 
@@ -177,34 +246,26 @@ onMounted(async () => {
     </div>
 
     <template v-else>
-      <div class="mt-6 flex flex-wrap gap-3">
-        <UCard
-          v-for="(summary, index) in summaryCards"
-          :key="summary.label"
-          v-motion
-          :initial="{ opacity: 0, y: 12 }"
-          :enter="{
-            opacity: 1,
-            y: 0,
-            transition: { duration: 250, delay: index * 80 },
-          }"
-          class="flex-1 min-w-[120px]"
-        >
-          <div class="flex flex-col items-center text-center">
-            <span class="text-xs uppercase tracking-wide text-neutral-500">{{
-              summary.label
-            }}</span>
-            <span class="text-lg font-semibold">{{
-              formatCurrency(summary.value, check.currencySymbol)
-            }}</span>
-          </div>
-        </UCard>
-      </div>
+      <UCard
+        v-motion
+        :initial="{ opacity: 0, y: 12 }"
+        :enter="{ opacity: 1, y: 0, transition: { duration: 250, delay: 80 } }"
+        class="mt-6"
+      >
+        <div class="flex flex-col items-center gap-2 text-center">
+          <span class="text-xs uppercase tracking-wide text-neutral-500">
+            Total
+          </span>
+          <span class="text-2xl font-semibold">
+            {{ formatCurrency(grandTotal, check.currencySymbol) }}
+          </span>
+        </div>
+      </UCard>
 
       <UCard
         v-motion
         :initial="{ opacity: 0, y: 12 }"
-        :enter="{ opacity: 1, y: 0, transition: { duration: 250, delay: 240 } }"
+        :enter="{ opacity: 1, y: 0, transition: { duration: 250, delay: 160 } }"
         class="mt-4"
       >
         <button
@@ -212,11 +273,7 @@ onMounted(async () => {
           class="w-full flex items-center justify-between gap-4 min-h-[44px] text-left"
           @click="toggleItems"
         >
-          <span class="text-lg font-semibold">
-            {{ check.items.length }} item{{
-              check.items.length === 1 ? "" : "s"
-            }}
-          </span>
+          <span class="text-lg font-semibold">Receipt</span>
           <UIcon
             name="i-lucide-chevron-down"
             class="size-5 text-neutral-400 transition-transform"
@@ -225,96 +282,53 @@ onMounted(async () => {
         </button>
 
         <ul
-          v-if="itemsExpanded && check.items.length > 0"
+          v-if="itemsExpanded && receiptEntries.length > 0"
           v-motion
           :initial="{ opacity: 0, height: 0 }"
           :enter="{ opacity: 1, height: 'auto', transition: { duration: 200 } }"
           class="mt-4 flex flex-col gap-2 overflow-hidden"
         >
           <li
-            v-for="item in check.items"
-            :key="item.id"
+            v-for="entry in receiptEntries"
+            :key="entry.key"
             class="flex items-center justify-between gap-4 py-2 border-b last:border-b-0"
           >
-            <span class="truncate">{{ item.label || "Unnamed item" }}</span>
+            <span class="truncate">{{ entry.label }}</span>
             <span class="font-medium whitespace-nowrap">{{
-              formatCurrency(item.amount, check.currencySymbol)
+              formatCurrency(entry.amount, check.currencySymbol)
             }}</span>
           </li>
         </ul>
       </UCard>
 
-      <UCard
-        v-if="hasPayment && check.paymentMethod === PaymentMethod.Venmo"
-        v-motion
-        :initial="{ opacity: 0, y: 12 }"
-        :enter="{ opacity: 1, y: 0, transition: { duration: 250, delay: 280 } }"
-        class="mt-4"
-      >
-        <div class="flex flex-col items-center gap-3 text-center">
-          <span class="text-sm text-neutral-500">
-            Total to send
-          </span>
-          <span class="text-2xl font-semibold">
-            {{ formatCurrency(grandTotal, check.currencySymbol) }}
-          </span>
-          <UButton
-            label="Pay on Venmo"
-            icon="i-lucide-send"
-            color="primary"
-            size="lg"
-            block
-            class="min-h-[44px] mt-2"
-            @click="onPayVenmo"
-          />
-        </div>
-      </UCard>
-
-      <UCard
-        v-else-if="hasPayment && check.paymentMethod === PaymentMethod.Zelle"
-        v-motion
-        :initial="{ opacity: 0, y: 12 }"
-        :enter="{ opacity: 1, y: 0, transition: { duration: 250, delay: 280 } }"
-        class="mt-4"
-      >
-        <div class="flex flex-col items-center gap-3 text-center">
-          <span class="text-sm text-neutral-500">Send via Zelle</span>
-          <span class="text-2xl font-semibold">
-            {{ formatCurrency(grandTotal, check.currencySymbol) }}
-          </span>
-          <code
-            class="rounded-md bg-neutral-100 px-3 py-2 text-base font-mono break-all dark:bg-neutral-800"
-            data-testid="zelle-handle"
-          >
-            {{ check.paymentHandle }}
-          </code>
-          <UButton
-            label="Send via Zelle"
-            icon="i-lucide-send"
-            color="primary"
-            size="lg"
-            block
-            class="min-h-[44px] mt-2"
-            @click="onPayZelle"
-          />
-        </div>
-      </UCard>
-
       <UModal
-        v-model:open="zelleModalOpen"
-        title="Couldn't open Zelle link"
+        v-model:open="paymentModalOpen"
+        :title="zelleCopyState ? 'Couldn\u2019t open Zelle link' : 'Who are you paying for?'"
       >
         <template #body>
-          <div class="flex flex-col gap-3">
+          <!-- Zelle scheme-failed fallback. Replaces the body in place
+               rather than stacking a second modal. -->
+          <div v-if="zelleCopyState" class="flex flex-col gap-3">
             <p class="text-sm text-neutral-600 dark:text-neutral-400">
-              Copied <code class="font-mono">{{ check?.paymentHandle }}</code>
+              Copied <code class="font-mono">{{ formattedZelle }}</code>
               to clipboard — open your banking app and paste it into Zelle's
               "Send" field.
             </p>
           </div>
+          <div v-else class="flex flex-col gap-2">
+            <UCheckbox
+              v-for="breakdown in guestsWithBreakdown"
+              :key="breakdown.guest.id"
+              :model-value="selectedGuestIds.has(breakdown.guest.id)"
+              :label="breakdown.displayName"
+              :description="formatCurrency(breakdown.total, check?.currencySymbol ?? '$')"
+              class="min-h-[44px]"
+              @update:model-value="toggleGuestSelected(breakdown.guest.id)"
+            />
+          </div>
         </template>
         <template #footer>
-          <div class="flex justify-end gap-2">
+          <div v-if="zelleCopyState" class="flex justify-end gap-2">
             <UButton
               :label="handleCopied ? 'Copied!' : 'Copy again'"
               :icon="handleCopied ? 'i-lucide-check' : 'i-lucide-copy'"
@@ -325,7 +339,26 @@ onMounted(async () => {
             <UButton
               label="Done"
               color="primary"
-              @click="zelleModalOpen = false"
+              @click="paymentModalOpen = false"
+            />
+          </div>
+          <div v-else class="flex flex-col gap-2 w-full">
+            <UButton
+              :label="payButtonLabel"
+              icon="i-lucide-send"
+              color="primary"
+              size="lg"
+              block
+              class="min-h-[44px]"
+              :disabled="!canConfirmPay"
+              @click="onConfirmPay"
+            />
+            <UButton
+              label="Cancel"
+              color="neutral"
+              variant="ghost"
+              block
+              @click="paymentModalOpen = false"
             />
           </div>
         </template>
@@ -354,6 +387,35 @@ onMounted(async () => {
           :loading="isSharing"
           :disabled="isSharing"
           @click="onShare"
+        />
+      </div>
+
+      <div
+        v-if="hasVenmo || hasZelle"
+        v-motion
+        :initial="{ opacity: 0, y: 12 }"
+        :enter="{ opacity: 1, y: 0, transition: { duration: 250, delay: 240 } }"
+        class="mt-4 flex flex-col gap-2"
+      >
+        <UButton
+          v-if="hasVenmo"
+          :label="`Pay @${check.venmoHandle} on Venmo`"
+          icon="i-lucide-send"
+          color="primary"
+          size="lg"
+          block
+          class="min-h-[44px]"
+          @click="onPayVenmo"
+        />
+        <UButton
+          v-if="hasZelle"
+          :label="`Pay ${formattedZelle} on Zelle`"
+          icon="i-lucide-send"
+          color="primary"
+          size="lg"
+          block
+          class="min-h-[44px]"
+          @click="onPayZelle"
         />
       </div>
 

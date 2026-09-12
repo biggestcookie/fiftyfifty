@@ -136,7 +136,28 @@ export async function decodeCheck(
   const bytes = base64UrlToBytes(payload.slice(VERSION_PREFIX.length));
   const decompressed = await gunzip(bytes);
   const json = new TextDecoder().decode(decompressed);
-  return validateSharedPayload(JSON.parse(json));
+  return migrateLegacyPayment(validateSharedPayload(JSON.parse(json)));
+}
+
+/**
+ * Old payloads stored a single `paymentMethod` + `paymentHandle` pair.
+ * The new shape has independent `venmoHandle` / `zelleHandle` fields, so
+ * translate the legacy pair here before the check reaches the UI.
+ */
+function migrateLegacyPayment(
+  payload: SharedCheckPayload
+): SharedCheckPayload {
+  const legacy = (payload as unknown as Record<string, unknown>).paymentMethod;
+  const handle = (payload as unknown as Record<string, unknown>).paymentHandle;
+  if (typeof legacy !== "string" || typeof handle !== "string") {
+    return payload;
+  }
+  const record = payload as unknown as Record<string, unknown>;
+  if (legacy === "venmo") record.venmoHandle = handle;
+  else if (legacy === "zelle") record.zelleHandle = handle;
+  delete record.paymentMethod;
+  delete record.paymentHandle;
+  return record as unknown as SharedCheckPayload;
 }
 
 function validateSharedPayload(value: unknown): SharedCheckPayload {
