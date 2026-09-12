@@ -35,6 +35,8 @@ export interface Draft {
   currencySymbol: string;
   currentStep: Step;
   updatedAt: number;
+  /** Optional user-supplied name for the check (e.g. "Joe's Pizza"). */
+  name?: string;
   /** Venmo username (without the "@"). Optional; each handle is independent. */
   venmoHandle?: string;
   /** Zelle email or phone. Optional; each handle is independent. */

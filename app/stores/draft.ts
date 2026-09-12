@@ -108,6 +108,13 @@ export const useDraftStore = defineStore("draft", {
       if (this.draft) this.draft.currencySymbol = symbol;
     },
 
+    setName(name: string) {
+      if (!this.draft) return;
+      const trimmed = name.trim();
+      if (trimmed === "") delete this.draft.name;
+      else this.draft.name = trimmed;
+    },
+
     /**
      * Set the payment method independently of the handle. The handle is
      * preserved when switching methods so the user doesn't have to retype
@@ -156,6 +163,7 @@ export const useDraftStore = defineStore("draft", {
         currencySymbol: check.currencySymbol,
         currentStep: Step.Guests, // resume at the start of the flow so user can review guests/items
         updatedAt: Date.now(),
+        name: check.name,
         venmoHandle: check.venmoHandle,
         zelleHandle: check.zelleHandle,
       };
@@ -179,6 +187,7 @@ export const useDraftStore = defineStore("draft", {
         currencySymbol: this.draft.currencySymbol,
         currentStep: this.draft.currentStep,
         updatedAt: this.draft.updatedAt,
+        name: this.draft.name,
         venmoHandle: this.draft.venmoHandle,
         zelleHandle: this.draft.zelleHandle,
       };
@@ -264,6 +273,7 @@ export const useDraftStore = defineStore("draft", {
         currentStep: Step.Receipt,
         updatedAt: Date.now(),
         totals,
+        name: d.name,
         venmoHandle: d.venmoHandle,
         zelleHandle: d.zelleHandle,
       };

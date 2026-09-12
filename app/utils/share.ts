@@ -1,6 +1,7 @@
 import type { Check } from "~/types/check";
 
-const VERSION_PREFIX = "v1.";
+const LEGACY_VERSION_PREFIX = "v1.";
+const VERSION_PREFIX = "v2.";
 
 /**
  * Payloads (including the version prefix) must stay under this many
@@ -50,7 +51,7 @@ function bytesToBase64Url(bytes: Uint8Array<ArrayBuffer>): string {
   let out = "";
   for (let i = 0; i < bytes.length; i += 3) {
     const b0 = bytes[i] ?? 0;
-    const b1 = bytes[i + 1] ?? 0;
+    const b1 = bytes[i + 3] ?? 0;
     const b2 = bytes[i + 2] ?? 0;
     out += B64_ALPHABET.charAt(b0 >> 2);
     out += B64_ALPHABET.charAt(((b0 & 0x03) << 4) | (b1 >> 4));
@@ -88,24 +89,98 @@ function base64UrlToBytes(s: string): Uint8Array<ArrayBuffer> {
   return new Uint8Array(out);
 }
 
-async function gzip(
-  bytes: Uint8Array<ArrayBuffer>
+async function compress(
+  bytes: Uint8Array<ArrayBuffer>,
+  format: CompressionFormat
 ): Promise<Uint8Array<ArrayBuffer>> {
   const stream = new Blob([bytes])
     .stream()
-    .pipeThrough(new CompressionStream("gzip"));
+    .pipeThrough(new CompressionStream(format));
   const buf = await new Response(stream).arrayBuffer();
   return new Uint8Array(buf);
 }
 
-async function gunzip(
-  bytes: Uint8Array<ArrayBuffer>
+async function decompress(
+  bytes: Uint8Array<ArrayBuffer>,
+  format: CompressionFormat
 ): Promise<Uint8Array<ArrayBuffer>> {
   const stream = new Blob([bytes])
     .stream()
-    .pipeThrough(new DecompressionStream("gzip"));
+    .pipeThrough(new DecompressionStream(format));
   const buf = await new Response(stream).arrayBuffer();
   return new Uint8Array(buf);
+}
+
+/**
+ * TypeScript's `CompressionFormat` lib type predates brotli; runtime
+ * supports `"brotli"` in every modern browser. Cast at the boundary.
+ */
+const BROTLI = "brotli" as CompressionFormat;
+
+/**
+ * Short keys used in the on-the-wire v2 payload.
+ */
+interface ShortItem {
+  i: string;
+  l: string;
+  a: number;
+  g: string[];
+}
+
+interface ShortGuest {
+  i: string;
+  n?: string;
+}
+
+interface ShortFee {
+  i: string;
+  l: string;
+  a: number;
+}
+
+interface ShortPayload {
+  g: ShortGuest[];
+  i: ShortItem[];
+  f: ShortFee[];
+  m: string;
+  s: string;
+  v?: string;
+  z?: string;
+}
+
+function encodeShort(check: SharedCheckPayload): ShortPayload {
+  return {
+    g: check.guests.map((g) => (g.name ? { i: g.id, n: g.name } : { i: g.id })),
+    i: check.items.map((it) => ({
+      i: it.id,
+      l: it.label,
+      a: it.amount,
+      g: it.guestIds,
+    })),
+    f: check.fees.map((f) => ({ i: f.id, l: f.label, a: f.amount })),
+    m: check.feesMode,
+    s: check.currencySymbol,
+    v: check.venmoHandle,
+    z: check.zelleHandle,
+  };
+}
+
+function decodeShort(payload: ShortPayload): SharedCheckPayload {
+  const out: Record<string, unknown> = {
+    guests: payload.g.map((g) => (g.n ? { id: g.i, name: g.n } : { id: g.i })),
+    items: payload.i.map((it) => ({
+      id: it.i,
+      label: it.l,
+      amount: it.a,
+      guestIds: it.g,
+    })),
+    fees: payload.f.map((f) => ({ id: f.i, label: f.l, amount: f.a })),
+    feesMode: payload.m,
+    currencySymbol: payload.s,
+  };
+  if (payload.v) out.venmoHandle = payload.v;
+  if (payload.z) out.zelleHandle = payload.z;
+  return out as unknown as SharedCheckPayload;
 }
 
 export async function encodeCheck(check: Check): Promise<string> {
@@ -118,7 +193,12 @@ export async function encodeCheck(check: Check): Promise<string> {
     ...data
   } = check;
 
-  const compressed = await gzip(new TextEncoder().encode(JSON.stringify(data)));
+  const short = encodeShort(data as SharedCheckPayload);
+  const json = JSON.stringify(short);
+  const compressed = await compress(
+    new TextEncoder().encode(json),
+    BROTLI
+  );
   const encoded = bytesToBase64Url(compressed);
   const payload = `${VERSION_PREFIX}${encoded}`;
   if (payload.length > MAX_SHARE_PAYLOAD_CHARS) {
@@ -130,13 +210,23 @@ export async function encodeCheck(check: Check): Promise<string> {
 export async function decodeCheck(
   payload: string
 ): Promise<SharedCheckPayload> {
-  if (!payload.startsWith(VERSION_PREFIX)) {
-    throw new Error("Unsupported share payload version");
+  if (payload.startsWith(VERSION_PREFIX)) {
+    const bytes = base64UrlToBytes(payload.slice(VERSION_PREFIX.length));
+    const decompressed = await decompress(bytes, BROTLI);
+    const json = new TextDecoder().decode(decompressed);
+    const short = JSON.parse(json) as ShortPayload;
+    return decodeShort(short);
   }
-  const bytes = base64UrlToBytes(payload.slice(VERSION_PREFIX.length));
-  const decompressed = await gunzip(bytes);
-  const json = new TextDecoder().decode(decompressed);
-  return migrateLegacyPayment(validateSharedPayload(JSON.parse(json)));
+
+  if (payload.startsWith(LEGACY_VERSION_PREFIX)) {
+    const bytes = base64UrlToBytes(payload.slice(LEGACY_VERSION_PREFIX.length));
+    const decompressed = await decompress(bytes, "gzip");
+    const json = new TextDecoder().decode(decompressed);
+    const long = migrateLegacyPayment(validateSharedPayload(JSON.parse(json)));
+    return long;
+  }
+
+  throw new Error("Unsupported share payload version");
 }
 
 /**

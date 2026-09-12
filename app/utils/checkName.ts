@@ -12,10 +12,13 @@ function guestCount(check: Check): number {
 
 /**
  * Build a human-readable name for a check.
+ * - Uses `check.name` when the user provided one (overrides generation).
  * - "Check with Name1, Name2, # more" when any guest has a name.
  * - "Check with N people" (or "1 person") when no guests are named.
  */
 export function checkName(check: Check): string {
+  const userName = check.name?.trim();
+  if (userName) return userName;
   const named = namedGuests(check);
   if (named.length > 0) {
     const head = named.slice(0, 2).join(", ");

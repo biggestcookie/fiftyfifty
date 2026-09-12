@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import QRCode from "qrcode-svg";
 import type { Check, Guest, Item } from "~/types/check";
 import { openVenmoWithFallback, tryZelleScheme } from "~/utils/payment";
 import { formatZelleHandle } from "~/utils/zelle";
+import { buildShareUrl, encodeCheck } from "~/utils/share";
 
 const route = useRoute();
 const router = useRouter();
@@ -18,6 +20,36 @@ function onEdit() {
 function onShare() {
   if (!check.value) return;
   share(check.value);
+}
+
+const qrOpen = ref(false);
+const qrError = ref<string | null>(null);
+const qrSvg = ref<string>("");
+
+async function onToggleQr() {
+  if (!check.value) return;
+  if (qrOpen.value) {
+    qrOpen.value = false;
+    return;
+  }
+  qrError.value = null;
+  try {
+    const payload = await encodeCheck(check.value);
+    const url = buildShareUrl(payload);
+    qrSvg.value = new QRCode({ content: url, width: 200, height: 200 }).svg();
+    qrOpen.value = true;
+  } catch (error) {
+    qrError.value =
+      error instanceof Error && /too long|too large|overflow/i.test(error.message)
+        ? "Check is too large to share as a QR code."
+        : "Couldn't generate QR code. Try sharing the link instead.";
+    // eslint-disable-next-line no-console
+    console.error("[QR_ERROR]", error);
+  }
+}
+
+function onCloseQr() {
+  qrOpen.value = false;
 }
 
 const check = ref<Check | null>(null);
@@ -385,6 +417,46 @@ onMounted(async () => {
           :loading="isSharing"
           :disabled="isSharing"
           @click="onShare"
+        />
+        <UButton
+          label="QR"
+          variant="ghost"
+          color="neutral"
+          icon="i-lucide-qr-code"
+          class="min-h-[44px]"
+          @click="onToggleQr"
+        />
+      </div>
+
+      <div
+        v-if="qrError"
+        v-motion
+        :initial="{ opacity: 0, y: 8 }"
+        :enter="{ opacity: 1, y: 0, transition: { duration: 200 } }"
+        class="mt-4 flex justify-center"
+      >
+        <p class="text-sm text-error-600">{{ qrError }}</p>
+      </div>
+
+      <div
+        v-if="qrOpen"
+        v-motion
+        :initial="{ opacity: 0, y: 8 }"
+        :enter="{ opacity: 1, y: 0, transition: { duration: 200 } }"
+        class="mt-4 flex flex-col items-center gap-3"
+      >
+        <!-- eslint-disable-next-line vue/no-v-html -->
+        <div
+          class="bg-white p-2 rounded-lg"
+          v-html="qrSvg"
+        />
+        <UButton
+          label="Close"
+          variant="ghost"
+          color="neutral"
+          icon="i-lucide-x"
+          class="min-h-[44px]"
+          @click="onCloseQr"
         />
       </div>
 

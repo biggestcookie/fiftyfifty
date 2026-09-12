@@ -36,6 +36,11 @@ const venmoHandle = computed<string>({
   set: (value) => draft.setVenmoHandle(value),
 });
 
+const checkName = computed<string>({
+  get: () => draft.draft?.name ?? "",
+  set: (value) => draft.setName(value),
+});
+
 const zelleHandle = computed<string>({
   get: () => draft.draft?.zelleHandle ?? "",
   set: (value) => draft.setZelleHandle(value),
@@ -124,6 +129,16 @@ function normalizeZelleInput(event: Event) {
             />
           </UFormField>
         </div>
+
+        <UFormField label="Name your check (optional)">
+          <UInput
+            v-model="checkName"
+            placeholder="Where'd you eat?"
+            type="text"
+            class="w-full"
+            autocomplete="off"
+          />
+        </UFormField>
 
         <div class="flex flex-col gap-4 border-t border-neutral-200 pt-6 dark:border-neutral-800">
           <p class="text-sm text-neutral-500">
