@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { Step } from "~/types/check";
+import type { SourceOrigin } from "~/stores/receiptScan";
 
 const draft = useDraftStore();
 const flow = useSplitFlow();
+const scanStore = useReceiptScanStore();
 
 onMounted(() => {
   if (draft.itemCount === 0) {
@@ -200,6 +202,10 @@ async function onFileSelected(event: Event) {
   const file = input.files?.[0];
   if (!file) return;
 
+  // The two file inputs are wired identically; which one fired tells us the
+  // source, which the store uses later to decide Retake visibility.
+  const origin: SourceOrigin = input === photoInput.value ? "camera" : "library";
+
   const items = draft.draft?.items ?? [];
   const fees = draft.draft?.fees ?? [];
   // "User content" = a non-zero amount the user has actually entered. The
@@ -220,16 +226,29 @@ async function onFileSelected(event: Event) {
     }
   }
 
-  if (scanPreviewUrl.value) URL.revokeObjectURL(scanPreviewUrl.value);
-  scanPreviewUrl.value = URL.createObjectURL(file);
+  // Open the crop modal instead of scanning directly; the cropped blob comes
+  // back through onCroppedForScan once the user confirms.
   scanNotice.value = null;
+  scanStatus.value = "idle";
+  scanStore.openModal(file, origin);
+  // Reset the input so re-selecting the same file fires change again.
+  input.value = "";
+}
 
+/**
+ * Runs the existing scan pipeline with the cropped blob from the crop modal.
+ * Everything downstream of the file pick is unchanged from the pre-cropper
+ * flow — the crop only replaces the raw capture at the OCR boundary.
+ */
+async function onCroppedForScan(blob: Blob) {
+  if (scanPreviewUrl.value) URL.revokeObjectURL(scanPreviewUrl.value);
+  scanPreviewUrl.value = URL.createObjectURL(blob);
+  scanNotice.value = null;
   scanStatus.value = "preparing";
   try {
-    const processed = await scanner.preprocessImage(file);
     await scanner.warmup();
     scanStatus.value = "reading";
-    const parsed = await scanner.scan(processed);
+    const parsed = await scanner.scan(blob);
     console.info("receipt ocr: parsed", parsed);
     draft.replaceFromScan({
       items: parsed.items,
@@ -666,5 +685,7 @@ onBeforeUnmount(() => {
     <div v-if="draft.canUndoScan" class="mt-3 flex justify-end">
       <UButton label="Undo scan" variant="link" size="sm" @click="undoScan" />
     </div>
+
+    <ReceiptCropperModal @scanned="onCroppedForScan" />
   </div>
 </template>
