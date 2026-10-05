@@ -2,6 +2,13 @@ import type { Check } from "~/types/check";
 
 const LEGACY_VERSION_PREFIX = "v1.";
 const VERSION_PREFIX = "v2.";
+/**
+ * Fallback prefix when the runtime can't construct `CompressionStream` with
+ * `"brotli"` (Safari < 16.4 and a handful of older WebViews). The payload
+ * itself is identical — only the compression format differs — so the
+ * decoder picks by prefix.
+ */
+const VERSION_PREFIX_GZIP = "v2g.";
 
 /**
  * Payloads (including the version prefix) must stay under this many
@@ -100,6 +107,30 @@ async function compress(
   return new Uint8Array(buf);
 }
 
+/**
+ * Compress with brotli when available, falling back to gzip on browsers
+ * that lack `CompressionStream("brotli")` (Safari < 16.4). Brotli typically
+ * produces smaller output (~10–15% smaller than gzip on JSON payloads),
+ * which matters for the 8000-char share-URL cap and QR capacity.
+ */
+async function compressAdaptive(
+  bytes: Uint8Array<ArrayBuffer>
+): Promise<{ format: "brotli" | "gzip"; data: Uint8Array<ArrayBuffer> }> {
+  try {
+    const data = await compress(bytes, BROTLI);
+    return { format: "brotli", data };
+  } catch (error) {
+    if (
+      error instanceof TypeError &&
+      /Unsupported compression format/i.test(error.message)
+    ) {
+      const data = await compress(bytes, "gzip");
+      return { format: "gzip", data };
+    }
+    throw error;
+  }
+}
+
 async function decompress(
   bytes: Uint8Array<ArrayBuffer>,
   format: CompressionFormat
@@ -195,12 +226,12 @@ export async function encodeCheck(check: Check): Promise<string> {
 
   const short = encodeShort(data as SharedCheckPayload);
   const json = JSON.stringify(short);
-  const compressed = await compress(
-    new TextEncoder().encode(json),
-    BROTLI
+  const { format, data: compressed } = await compressAdaptive(
+    new TextEncoder().encode(json)
   );
   const encoded = bytesToBase64Url(compressed);
-  const payload = `${VERSION_PREFIX}${encoded}`;
+  const prefix = format === "brotli" ? VERSION_PREFIX : VERSION_PREFIX_GZIP;
+  const payload = `${prefix}${encoded}`;
   if (payload.length > MAX_SHARE_PAYLOAD_CHARS) {
     throw new Error("Check is too large to share");
   }
@@ -213,6 +244,16 @@ export async function decodeCheck(
   if (payload.startsWith(VERSION_PREFIX)) {
     const bytes = base64UrlToBytes(payload.slice(VERSION_PREFIX.length));
     const decompressed = await decompress(bytes, BROTLI);
+    const json = new TextDecoder().decode(decompressed);
+    const short = JSON.parse(json) as ShortPayload;
+    return decodeShort(short);
+  }
+
+  if (payload.startsWith(VERSION_PREFIX_GZIP)) {
+    const bytes = base64UrlToBytes(
+      payload.slice(VERSION_PREFIX_GZIP.length)
+    );
+    const decompressed = await decompress(bytes, "gzip");
     const json = new TextDecoder().decode(decompressed);
     const short = JSON.parse(json) as ShortPayload;
     return decodeShort(short);
