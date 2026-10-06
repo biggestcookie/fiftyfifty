@@ -40,10 +40,9 @@ export function useReceiptCropper(source: Ref<Blob | null>) {
   const cropperRef = shallowRef<Cropper | null>(null);
   const isReady = ref(false);
   const isValid = ref(true);
-  // Canvas's intrinsic size in canvas-internal CSS px. Selection x/y/w/h
-  // live in this same coordinate system. With `initial-fit="cover"` the
-  // image fills the canvas edge-to-edge, so these bounds equal the
-  // image's visible rect — the right clamp target for drag containment.
+  // Canvas's client size in CSS px. Selection x/y/w/h live in this same
+  // coordinate system — these bounds are the clamp target for drag
+  // containment. Updated on init and on every resize via ResizeObserver.
   const canvasSize = ref<CanvasSize>({ width: 0, height: 0 });
 
   const objectUrl = useObjectUrl(source);
@@ -53,9 +52,6 @@ export function useReceiptCropper(source: Ref<Blob | null>) {
     if (cropperRef.value) return; // already initialized
     const mod = await import("cropperjs");
     const CropperClass = mod.default;
-    // Cropper.js 2.x reads `src` off the <img>, wraps it in its canonical
-    // <cropper-canvas> template and hides the original img. All config that
-    // was v1 constructor options is set on the generated elements below.
     cropperRef.value = new CropperClass(containerRef.value) as unknown as Cropper;
     const canvas = cropperRef.value.getCropperCanvas();
     const selection = cropperRef.value.getCropperSelection();
@@ -64,29 +60,20 @@ export function useReceiptCropper(source: Ref<Blob | null>) {
       // v1 `background: false` analog: drop the checkerboard from the
       // default template so the modal's neutral background shows through.
       canvas.removeAttribute("background");
-      // Fill the crop area rather than overflowing it with natural-size rows.
+      // Fill the wrapper. The canvas web-component has no intrinsic
+      // size of its own — it sizes from its image. `width: 100%` /
+      // `height: 100%` makes it match the wrapper, then the image's
+      // fit mode (set below to "cover") determines how the image fills
+      // that box.
       canvas.style.width = "100%";
       canvas.style.height = "100%";
-      // `cover` fills the canvas edge-to-edge with the image (no letterbox
-      // padding). The default `contain` centers the image and leaves white
-      // padding on the long axis, which made the image appear offset down
-      // and to the right inside the wrapper.
-      image?.setAttribute("initial-fit", "cover");
     }
     if (selection) {
       // No aspect lock — the rectangle is freeform.
-      // Default to ~95% coverage so the user sees the whole receipt on
-      // open and only tightens if they want to. 100% clips to the image
-      // edge and leaves no visible margin, which feels broken.
       selection.initialCoverage = 0.95;
       selection.addEventListener("change", (event: Event) => {
         const detail = (event as CustomEvent<SelectionGeometry>).detail;
         if (!detail) return;
-        // Clamp the selection back inside the canvas. Cropper v2 does not
-        // honour native `movable`/`resizable` bounds at the canvas level
-        // the way v1 did — we have to enforce it ourselves. Setting the
-        // properties back during the event also prevents the drag from
-        // committing, which is what caused the "locked" feel before.
         const max = canvasSize.value;
         if (max.width <= 0 || max.height <= 0) return;
         let { x, y, width, height } = detail;
@@ -112,16 +99,20 @@ export function useReceiptCropper(source: Ref<Blob | null>) {
       });
     }
     try {
-      // Wait for the load+cover-fit to finish so the "Loading…" skeleton
-      // stays up until the selection is truly usable.
       await image?.$ready();
     } catch {
       // Image failed to decode — still mark ready; Scan errors cleanly.
     }
-    // After the image has been cover-fit into the canvas, the canvas's
-    // client size equals the displayed image's bounding rect — that's
-    // the rect we clamp selection bounds against. clientWidth/Height are
-    // CSS px matching selection coordinates exactly.
+    // After $ready() resolves, Cropper's `$isReady` is true and any
+    // property change on the image triggers a re-center via `$nextTick`.
+    // Switch the fit to "cover" so the image fills the canvas edge-to-edge
+    // — the default contain-fit centres the image and leaves padding on
+    // the long axis (the wrapper's aspect ratio rarely matches the
+    // image's), which made the image look offset down/right inside the
+    // wrapper.
+    if (image) {
+      (image as { initialFit?: string }).initialFit = "cover";
+    }
     if (canvas) {
       canvasSize.value = { width: canvas.clientWidth, height: canvas.clientHeight };
       resizeObserver?.observe(canvas);
@@ -147,8 +138,6 @@ export function useReceiptCropper(source: Ref<Blob | null>) {
     }
     const [scaleX = 1] = image.$getTransform();
     if (!Number.isFinite(scaleX) || scaleX <= 0) return null;
-    // Convert the selection's canvas-space size back to the image's natural
-    // resolution so the export isn't limited to the on-screen display size.
     let outputWidth = Math.round(selection.width / scaleX);
     const outputHeight = Math.round(outputWidth * (selection.height / selection.width));
     const longest = Math.max(outputWidth, outputHeight);
@@ -159,9 +148,6 @@ export function useReceiptCropper(source: Ref<Blob | null>) {
       const canvas = await selection.$toCanvas({
         width: outputWidth,
         beforeDraw: (ctx) => {
-          // v1 `fillColor: '#fff'` analog — JPEG has no alpha, so any
-          // letterboxed margin inside the crop must be white, not
-          // transparent.
           ctx.fillStyle = "#fff";
           ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
           ctx.imageSmoothingEnabled = true;
@@ -210,7 +196,6 @@ export function useReceiptCropper(source: Ref<Blob | null>) {
         destroy();
         return;
       }
-      // wait for the <img> to actually load the new src before re-init
       await nextTick();
       if (containerRef.value && objectUrl.value) {
         await initCropper();

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, toRef } from "vue";
+import { onMounted, toRef } from "vue";
 
 const props = defineProps<{
   source: Blob | null;
@@ -22,11 +22,11 @@ defineExpose({ getCroppedBlob, getBounds, rotate, setPerspective });
 </script>
 
 <template>
-  <!-- The generated <cropper-canvas> replaces the <img> in the DOM and
-       sizes itself to its parent. Cropper v2 expects an explicit layout
-       box here — a `display: contents` host or a hidden img both leave
-       the canvas with no CSS area to compute its contain-fit against,
-       so the selection collapses to a tiny box at the top left. -->
+  <!-- The wrapper provides the layout box for the generated
+       <cropper-canvas>, which Cropper v2 sizes to `width: 100% /
+       height: 100%` of this container. The image inside the canvas is
+       cover-fit, so a portrait phone photo fills a landscape wrapper
+       edge-to-edge (no whitespace letterbox). -->
   <div class="relative h-full w-full overflow-hidden">
     <img
       v-if="objectUrl"
