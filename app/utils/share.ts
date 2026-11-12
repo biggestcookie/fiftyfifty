@@ -58,7 +58,7 @@ function bytesToBase64Url(bytes: Uint8Array<ArrayBuffer>): string {
   let out = "";
   for (let i = 0; i < bytes.length; i += 3) {
     const b0 = bytes[i] ?? 0;
-    const b1 = bytes[i + 3] ?? 0;
+    const b1 = bytes[i + 1] ?? 0;
     const b2 = bytes[i + 2] ?? 0;
     out += B64_ALPHABET.charAt(b0 >> 2);
     out += B64_ALPHABET.charAt(((b0 & 0x03) << 4) | (b1 >> 4));
