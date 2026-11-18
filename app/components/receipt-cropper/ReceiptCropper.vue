@@ -24,9 +24,10 @@ defineExpose({ getCroppedBlob, getBounds, rotate, setPerspective });
 <template>
   <!-- The wrapper provides the layout box for the generated
        <cropper-canvas>, which Cropper v2 sizes to `width: 100% /
-       height: 100%` of this container. The image inside the canvas is
-       cover-fit, so a portrait phone photo fills a landscape wrapper
-       edge-to-edge (no whitespace letterbox). -->
+       height: 100%` of this container. The image is contain-fit, so the
+       whole photo is always visible; when the photo's aspect ratio
+       differs from the wrapper's, the canvas letterboxes around it and
+       the crop selection is clamped to the visible image. -->
   <div class="relative h-full w-full overflow-hidden">
     <img
       v-if="objectUrl"

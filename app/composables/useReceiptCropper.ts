@@ -11,7 +11,10 @@ import {
 // Type-only imports: the runtime value comes from the dynamic `import()` in
 // initCropper so SSR never touches the Cropper.js module side effects.
 import type Cropper from "cropperjs";
-import type { CropperSelection as CropperSelectionElement } from "cropperjs";
+import type {
+  CropperImage as CropperImageElement,
+  CropperSelection as CropperSelectionElement,
+} from "cropperjs";
 import type { CropBoxBounds } from "~/stores/receiptScan";
 
 /**
@@ -30,22 +33,139 @@ type SelectionGeometry = {
   height: number;
 };
 
-type CanvasSize = {
-  width: number;
-  height: number;
-};
-
 export function useReceiptCropper(source: Ref<Blob | null>) {
   const containerRef = ref<HTMLImageElement | null>(null);
   const cropperRef = shallowRef<Cropper | null>(null);
   const isReady = ref(false);
   const isValid = ref(true);
-  // Canvas's client size in CSS px. Selection x/y/w/h live in this same
-  // coordinate system — these bounds are the clamp target for drag
-  // containment. Updated on init and on every resize via ResizeObserver.
-  const canvasSize = ref<CanvasSize>({ width: 0, height: 0 });
+  // Rendered image rect in canvas coordinates. The image is contain-fit, so
+  // it can be smaller than the canvas (which letterboxes around it).
+  // Selection x/y/w/h live in the same coordinate system — the selection is
+  // clamped to this rect so a crop can never include letterbox padding.
+  // Refreshed after every re-fit (init, resize, rotation).
+  const imageRect = ref<SelectionGeometry>({ x: 0, y: 0, width: 0, height: 0 });
 
   const objectUrl = useObjectUrl(source);
+
+  // Cropper.js gates $center/$rotate/$scale behind the rotatable/scalable/
+  // translatable flags (all off by default, so user gestures cannot
+  // transform the image). Flip them on only for programmatic calls.
+  function withTransformFlags(image: CropperImageElement, fn: () => void): void {
+    const { rotatable, scalable, translatable } = image;
+    image.rotatable = true;
+    image.scalable = true;
+    image.translatable = true;
+    try {
+      fn();
+    } finally {
+      image.$nextTick(() => {
+        image.rotatable = rotatable;
+        image.scalable = scalable;
+        image.translatable = translatable;
+      });
+    }
+  }
+
+  // Contain-fit and centre the image so the whole photo is visible. (The
+  // previous "cover" fit filled the canvas edge-to-edge and silently
+  // discarded whatever fell outside it — top/bottom of portrait photos,
+  // sides of landscape ones — so that content could never be cropped.)
+  // $center also re-uses the canvas's current rect, which fixes the stale
+  // fit Cropper computes at load time before the wrapper is laid out.
+  function refitImage() {
+    const image = cropperRef.value?.getCropperImage();
+    const canvas = cropperRef.value?.getCropperCanvas();
+    if (!image || !canvas) return;
+    // Skip degenerate layouts: a zero-size canvas or undecodable image
+    // makes $center's scale factor 0/Infinity and poisons the transform.
+    if (canvas.clientWidth <= 0 || canvas.clientHeight <= 0) return;
+    if (image.$image.naturalWidth <= 0) return;
+    withTransformFlags(image, () => {
+      image.$center("contain");
+    });
+  }
+
+  // Rounded to whole px: CropperSelection rounds its coordinates to
+  // integers (its `precise` mode is off), so fractional clamp bounds would
+  // make the change/apply round-trip never settle.
+  function setImageRect(rect: SelectionGeometry) {
+    imageRect.value = {
+      x: Math.round(rect.x),
+      y: Math.round(rect.y),
+      width: Math.round(rect.width),
+      height: Math.round(rect.height),
+    };
+  }
+
+  // Rect measurements in rendered px (getBoundingClientRect, and
+  // Cropper's own image-change detail) are affected by ancestor
+  // transforms — the modal's opening animation scales the whole frame —
+  // while the selection's x/y/w/h live in layout px. Undo the scale by
+  // comparing the canvas's rendered box with its layout size.
+  function toLayoutSpace(rect: SelectionGeometry): SelectionGeometry {
+    const canvas = cropperRef.value?.getCropperCanvas();
+    if (!canvas) return rect;
+    const rendered = canvas.getBoundingClientRect();
+    const scaleX = canvas.clientWidth > 0 ? rendered.width / canvas.clientWidth : 1;
+    const scaleY = canvas.clientHeight > 0 ? rendered.height / canvas.clientHeight : 1;
+    return {
+      x: scaleX ? rect.x / scaleX : rect.x,
+      y: scaleY ? rect.y / scaleY : rect.y,
+      width: scaleX ? rect.width / scaleX : rect.width,
+      height: scaleY ? rect.height / scaleY : rect.height,
+    };
+  }
+
+  function refreshImageRect() {
+    const canvas = cropperRef.value?.getCropperCanvas();
+    const image = cropperRef.value?.getCropperImage();
+    if (!canvas || !image) return;
+    const canvasBounds = canvas.getBoundingClientRect();
+    const imageBounds = image.getBoundingClientRect();
+    setImageRect(
+      toLayoutSpace({
+        x: imageBounds.left - canvasBounds.left,
+        y: imageBounds.top - canvasBounds.top,
+        width: imageBounds.width,
+        height: imageBounds.height,
+      })
+    );
+  }
+
+  function clampGeometry(
+    geometry: SelectionGeometry,
+    max: SelectionGeometry
+  ): SelectionGeometry {
+    let { x, y, width, height } = geometry;
+    if (width > max.width) width = max.width;
+    if (height > max.height) height = max.height;
+    if (x < max.x) x = max.x;
+    if (y < max.y) y = max.y;
+    if (x + width > max.x + max.width) x = max.x + max.width - width;
+    if (y + height > max.y + max.height) y = max.y + max.height - height;
+    return { x, y, width, height };
+  }
+
+  function clampSelection() {
+    const selection: CropperSelectionElement | null | undefined =
+      cropperRef.value?.getCropperSelection();
+    const max = imageRect.value;
+    if (!selection || max.width <= 0 || max.height <= 0) return;
+    const clamped = clampGeometry(
+      {
+        x: selection.x,
+        y: selection.y,
+        width: selection.width,
+        height: selection.height,
+      },
+      max
+    );
+    // Go through $change, not raw property writes: $change emits, applies
+    // and re-renders the box, while property writes leave the on-screen
+    // box stale (it only renders from inside $change).
+    selection.$change(clamped.x, clamped.y, clamped.width, clamped.height);
+    isValid.value = clamped.width > 0 && clamped.height > 0;
+  }
 
   async function initCropper() {
     if (!containerRef.value || !objectUrl.value) return;
@@ -62,40 +182,49 @@ export function useReceiptCropper(source: Ref<Blob | null>) {
       canvas.removeAttribute("background");
       // Fill the wrapper. The canvas web-component has no intrinsic
       // size of its own — it sizes from its image. `width: 100%` /
-      // `height: 100%` makes it match the wrapper, then the image's
-      // fit mode (set below to "cover") determines how the image fills
-      // that box.
+      // `height: 100%` makes it match the wrapper; the image is
+      // contain-fit inside it (see refitImage) so the whole photo is
+      // always visible.
       canvas.style.width = "100%";
       canvas.style.height = "100%";
     }
     if (selection) {
-      // No aspect lock — the rectangle is freeform.
-      selection.initialCoverage = 0.95;
+      // No aspect lock — the rectangle is freeform. Start with the whole
+      // image selected (100% of the canvas clamps to exactly the visible
+      // photo) so the default scan is never trimmed.
+      selection.initialCoverage = 1;
       selection.addEventListener("change", (event: Event) => {
         const detail = (event as CustomEvent<SelectionGeometry>).detail;
         if (!detail) return;
-        const max = canvasSize.value;
+        const max = imageRect.value;
         if (max.width <= 0 || max.height <= 0) return;
-        let { x, y, width, height } = detail;
-        if (width > max.width) width = max.width;
-        if (height > max.height) height = max.height;
-        if (x < 0) x = 0;
-        if (y < 0) y = 0;
-        if (x + width > max.width) x = max.width - width;
-        if (y + height > max.height) y = max.height - height;
+        const clamped = clampGeometry(detail, max);
         if (
-          x !== detail.x ||
-          y !== detail.y ||
-          width !== detail.width ||
-          height !== detail.height
+          clamped.x !== detail.x ||
+          clamped.y !== detail.y ||
+          clamped.width !== detail.width ||
+          clamped.height !== detail.height
         ) {
+          // Reject the out-of-bounds change, then apply the corrected
+          // geometry through $change so the box is re-rendered ($change
+          // aborts without rendering when its change event is prevented).
           event.preventDefault();
-          selection.x = x;
-          selection.y = y;
-          selection.width = width;
-          selection.height = height;
+          selection.$change(clamped.x, clamped.y, clamped.width, clamped.height);
         }
-        isValid.value = width > 0 && height > 0;
+        isValid.value = clamped.width > 0 && clamped.height > 0;
+      });
+    }
+    if (image) {
+      // Whenever the image is re-fitted (Cropper's own fit at load time can
+      // run after this init completes, as well as after rotation/resize), it
+      // emits `change` carrying its new rect in canvas coordinates —
+      // refresh the clamp target from it and pull the selection back inside.
+      // The detail is used instead of measuring the DOM because the event
+      // fires before the new transform is rendered.
+      image.addEventListener("change", (event: Event) => {
+        const detail = (event as CustomEvent<SelectionGeometry>).detail;
+        if (detail) setImageRect(toLayoutSpace(detail));
+        clampSelection();
       });
     }
     try {
@@ -103,25 +232,31 @@ export function useReceiptCropper(source: Ref<Blob | null>) {
     } catch {
       // Image failed to decode — still mark ready; Scan errors cleanly.
     }
-    // After $ready() resolves, Cropper's `$isReady` is true and any
-    // property change on the image triggers a re-center via `$nextTick`.
-    // Switch the fit to "cover" so the image fills the canvas edge-to-edge
-    // — the default contain-fit centres the image and leaves padding on
-    // the long axis (the wrapper's aspect ratio rarely matches the
-    // image's), which made the image look offset down/right inside the
-    // wrapper.
-    if (image) {
-      (image as { initialFit?: string }).initialFit = "cover";
-    }
+    // Re-fit against the canvas's current rect: Cropper's own fit runs at
+    // image load, which can happen before the wrapper is laid out (that is
+    // what made the image look offset inside the wrapper). Then clamp the
+    // initial selection into the visible image so it can never cover
+    // letterbox padding.
+    refitImage();
+    refreshImageRect();
+    clampSelection();
     if (canvas) {
-      canvasSize.value = { width: canvas.clientWidth, height: canvas.clientHeight };
       resizeObserver?.observe(canvas);
     }
     isReady.value = true;
   }
 
   function rotate(deg: number) {
-    cropperRef.value?.getCropperImage()?.$rotate(deg);
+    const image = cropperRef.value?.getCropperImage();
+    if (!image) return;
+    withTransformFlags(image, () => {
+      image.$rotate(deg);
+    });
+    // A 90° turn can push the image past the canvas on one axis — re-fit
+    // so the whole rotated photo stays visible, then re-clamp.
+    refitImage();
+    refreshImageRect();
+    clampSelection();
   }
 
   function setPerspective(_on: boolean) {
@@ -136,9 +271,13 @@ export function useReceiptCropper(source: Ref<Blob | null>) {
     if (!selection || !image || selection.width <= 0 || selection.height <= 0) {
       return null;
     }
-    const [scaleX = 1] = image.$getTransform();
-    if (!Number.isFinite(scaleX) || scaleX <= 0) return null;
-    let outputWidth = Math.round(selection.width / scaleX);
+    // Transform scale (canvas px per natural px). Use the matrix
+    // magnitude: the first entry alone is scale·cos(rotation) and is 0
+    // after a 90° rotation, which made the export bail out.
+    const [a = 1, b = 0] = image.$getTransform();
+    const scale = Math.hypot(a, b);
+    if (!Number.isFinite(scale) || scale <= 0) return null;
+    let outputWidth = Math.round(selection.width / scale);
     const outputHeight = Math.round(outputWidth * (selection.height / selection.width));
     const longest = Math.max(outputWidth, outputHeight);
     if (longest > MAX_CROP_EDGE) {
@@ -203,10 +342,10 @@ export function useReceiptCropper(source: Ref<Blob | null>) {
     }
   );
 
-  // Resize observer keeps the bounds-clamp target in sync when the canvas
-  // resizes (orientation change, browser window resize, soft keyboard on
-  // mobile). Attached from inside initCropper once the canvas exists;
-  // disconnected on unmount.
+  // Resize observer re-fits the image when the canvas resizes (orientation
+  // change, browser window resize, soft keyboard on mobile) so the whole
+  // photo stays visible, and keeps the clamp target in sync. Attached from
+  // inside initCropper once the canvas exists; disconnected on unmount.
   const resizeObserver: ResizeObserver | null =
     typeof ResizeObserver !== "undefined"
       ? new ResizeObserver((entries) => {
@@ -214,7 +353,9 @@ export function useReceiptCropper(source: Ref<Blob | null>) {
           if (!entry) return;
           const { width, height } = entry.contentRect;
           if (width > 0 && height > 0) {
-            canvasSize.value = { width, height };
+            refitImage();
+            refreshImageRect();
+            clampSelection();
           }
         })
       : null;
