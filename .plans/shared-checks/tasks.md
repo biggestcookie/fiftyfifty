@@ -509,3 +509,15 @@ risk because Netlify is the only builder.
 - Added `test/receipt-ocr-normalize.test.ts` covering normalization,
   malformed model rows, caps, printed totals, and confidence boundaries.
 - Typecheck, targeted ESLint, `bun test` (30), and build pass. Not committed.
+
+### 2026-11-19 — Phase 7 deploy check
+
+- Deployed `/api/ocr` (commit `35a667a`). The route is live and enforces the
+  image contract (`400` invalid/unsupported, `413` oversized, `no-store`).
+- A real production scan currently returns `502` and falls back to on-device
+  OCR. Temporary diagnostics showed the deployed function has **neither**
+  `GEMINI_API_KEY` nor `GOOGLE_GEMINI_BASE_URL`, so the SDK tries Application
+  Default Credentials and fails immediately.
+- This is configuration, not code: enable Netlify AI features/AI Gateway for
+  the site (or set a Gemini API key in the site env) to activate the server
+  path. Until then the server-first design degrades exactly as intended.
