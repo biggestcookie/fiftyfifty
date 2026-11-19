@@ -535,14 +535,15 @@ are the fallback and the explicit privacy path.
   API work; `nuxt dev` is still fine for client-only work. For unit tests,
   inject a small in-memory store instead of calling Blobs.
 - **Deployment ownership (decided):** Netlify's Git integration builds with
-  `bun run build` (configured in `netlify.toml`) and publishes
-  `.output/public`. The old `.github/workflows/web-deploy.yml` (GitHub Pages
-  via `bun run generate`) is removed. There is no GitHub Actions deploy and
-  no CI workflow.
+  `bun run build` (configured in `netlify.toml`) and publishes `dist`. The old
+  `.github/workflows/web-deploy.yml` (GitHub Pages via `bun run generate`) is
+  removed. There is no GitHub Actions deploy and no CI workflow.
 - **`bun run build` does not mean SSR.** `ssr: false` is what keeps the app a
   client-rendered SPA/PWA. `nuxt build` produces the static client assets plus
-  a Nitro server used only for `server/api/*` and platform functions. Netlify
-  serves pages from `.output/public` and routes `/api/*` to the function.
+  a Nitro server used only for `server/api/*` and platform functions. The
+  Nitro netlify preset emits client assets to `dist/` and the server function
+  to `.netlify/functions-internal`; Netlify serves pages from `dist` and routes
+  `/api/*` to the function.
 - **Static-only alternative:** if you want to keep `bun run generate`, deploy
   the static client and write standalone functions in `netlify/functions/`
   instead of `server/api/`. Netlify runs both alongside each other. This keeps

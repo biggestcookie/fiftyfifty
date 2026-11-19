@@ -4,9 +4,9 @@
 
 - [x] Add dependencies: `@netlify/blobs` (11.1.9), `@google/genai` (3.6.1).
 - [x] Add `server/api/health.get.ts` returning `{ ok: true }`.
-- [ ] Confirm the health route deploys with the existing
-      `nitro.preset: "netlify"` and `ssr: false` (first `bun run build`
-      deploy).
+- [x] Confirm the health route deploys with the existing
+      `nitro.preset: "netlify"` and `ssr: false`. Verified on the PR deploy
+      preview: `/api/health` → `200 {"ok":true}`.
 - [x] Add a `server/README` note covering local Blobs/AI Gateway setup and the
       `nuxt dev` limitation (client-only work).
 - [ ] Confirm `netlify dev` injects Netlify Blobs context locally. Not yet
@@ -22,30 +22,32 @@
 
 **Decision: Netlify Git integration owns deployment. GitHub Actions is
 removed entirely (no deploy job, no CI).** A push to the production branch
-runs `bun run build` and publishes `.output/public`. There is no double-build
+runs `bun run build` and publishes `dist`. There is no double-build
 risk because Netlify is the only builder.
 
 - [x] Choose one deployment owner: **Netlify Git integration**.
 - [x] Confirm the Netlify build command is `bun run build`, **not**
       `bun run generate` (pinned in `netlify.toml`).
 - [x] Confirm `ssr: false` remains in `nuxt.config.ts`.
-- [ ] Verify the PWA still uses the static SPA shell and that
+- [x] Verify the PWA still uses the static SPA shell and that
       `navigateFallback: "200.html"` is still emitted after the first
-      `bun run build` deploy. (The current live deploy emitted `200.html`.)
-- [x] Confirm the publish directory is `.output/public` (`netlify.toml`).
+      `bun run build` deploy. Verified on the deploy preview: `/200.html` → 200.
+- [x] Confirm the publish directory is `dist` (`netlify.toml`). The Nitro
+      netlify preset emits client assets to `dist/` and the function to
+      `.netlify/functions-internal`; `.output/public` does not exist.
 - [x] Remove the disabled GitHub Pages workflow; do not replace it with a
       GitHub Actions deploy. No workflows remain.
 - [x] Confirm Netlify detects Bun: this repo uses `bun.lock` (not
       `bun.lockb`), so pin `BUN_VERSION = "1.3.14"` in `netlify.toml`.
 - [x] Add `netlify.toml` pinning `[build] command = "bun run build"`,
-      `publish = ".output/public"`, the functions directory, and local
+      `publish = "dist"`, the functions directory, and local
       `netlify dev`.
 - [x] Do not switch to `bun run generate`.
 - The `bun run generate` + standalone-functions variant and the GitHub
   Actions → Netlify CLI variant are **not** used. The Netlify CLI is only
   used locally for `netlify dev` (run under Node; it crashes under Bun).
 - [ ] Confirm server routes are included in the Netlify deploy:
-  - [ ] `server/api/health.get.ts` responds after deploy.
+  - [x] `server/api/health.get.ts` responds after deploy (deploy preview).
   - [ ] `netlify/functions/cleanup-expired.mts` appears in the deployed
         functions list (blocked on Phase 3).
   - [ ] The scheduled cleanup function can be triggered manually once
@@ -59,22 +61,32 @@ risk because Netlify is the only builder.
   - [ ] For integration tests that hit real Blobs, provide `NETLIFY_SITE_ID` +
         `NETLIFY_AUTH_TOKEN` (or `NETLIFY_BLOBS_CONTEXT`) only in the job that
         runs them; unit tests should use the in-memory store.
-- [ ] Verify the deployment actually serves a live API and Blobs write/read.
-      Blocked on the first `bun run build` deploy; the current live deploy
-      contains no functions.
+- [x] Verify the deployment serves a live API. Verified on the PR deploy
+      preview.
+- [ ] Verify Blobs write/read once Phase 2 calls it; unit tests use the
+      in-memory store.
 
 ### Netlify MCP configuration check (2026-11-18)
 
 - Project `splitfiftyfifty`, site ID
   `e55da5d7-61fe-407e-899d-7e6f8f013e1c`,
   `https://splitfiftyfifty.netlify.app`.
-- Current production deploy `a49cce6` matches HEAD, branch `main`, state
-  `ready`.
-- That deploy has **no functions** and emitted static pages including
-  `200.html`, confirming it was built with the old `generate` path.
+- Latest production deploy is `8b9d564` on `main` (not this branch); it has
+  no functions. The earlier production deploy `a49cce6` matched HEAD at the
+  start of this work and was built with the old `generate` path.
 - Site env vars: only `NITRO_PRESET=netlify`. No `GEMINI_API_KEY` yet
   (Phase 7). Team env vars: none.
 - Blobs region: `us-east-2`.
+
+### Deploy preview check (2026-11-18)
+
+- PR #1 (`feature/shared-checks`), commit `b4d66fa`.
+- Deploy `6afe457afffea6928b29887d`: `ready`, context `deploy-preview`.
+- `available_functions` includes the Nuxt `server` function.
+- `GET /api/health` → `200 {"ok":true}`.
+- `GET /200.html` → `200`; `GET /` → `200`.
+- The first preview (`675757f`) failed: `publish` was `.output/public`, but the
+  Nitro netlify preset emits client assets to `dist/`. Fixed in `b4d66fa`.
 
 ## Phase 1 — Shared types and totals
 
@@ -307,14 +319,16 @@ risk because Netlify is the only builder.
   and `server/README.md`.
 - Deployment decision: Netlify Git integration only. The disabled GitHub Pages
   workflow was removed and not replaced; there is no GitHub Actions deploy.
-  `netlify.toml` pins `bun run build`, `.output/public`, `BUN_VERSION`, and the
+  `netlify.toml` pins `bun run build`, `dist`, `BUN_VERSION`, and the
   functions directory.
 - `netlify-cli` crashes under Bun (`enableCompileCache` returns null). Use
   Node for local `netlify dev`.
 - Shared types live in `shared/types/check.ts`; totals live in
   `shared/utils/check-totals.ts` and are used by `draft.finalize()` and the
   legacy share page. `bun test` passes (6 tests).
-- Not yet verified: `/api/health` deploy, `netlify dev` Blobs context,
-  `200.html` emission under `bun run build`, and live Blobs read/write.
-  The current live deploy (`a49cce6`) predates these changes, has no functions,
-  and was built with `generate`.
+- Verified on the PR #1 deploy preview: `/api/health` → `200 {"ok":true}`,
+  `/200.html` → `200`, and the `server` function is packaged. The first
+  preview failed because `publish` pointed at `.output/public`; Nitro's
+  netlify preset emits client assets to `dist/`.
+- Not yet verified: `netlify dev` Blobs context, live Blobs read/write, and
+  production (PR #1 is not merged).
