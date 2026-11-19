@@ -470,9 +470,12 @@ The recipient view has no Edit, Share, or QR actions. Payment buttons remain.
   `GOOGLE_GEMINI_BASE_URL`) so no provider key is stored in the repo.
 - Model: `gemini-3.5-flash-lite` with
   `responseMimeType: "application/json"` and a response schema.
-- Ask for `{ items: [{ label, amount }], fees: [{ label, amount }] }`.
+- Ask for `{ items: [{ label, amount }], fees: [{ label, amount }], total }`.
+  The printed `total` is used only for the confidence check and is not part of
+  the API response.
 - Validate and normalize the result (finite amounts, non-empty labels, drop
-  zero/blank rows, cap item count).
+  zero/blank rows, cap item count). The API returns
+  `{ items, fees, confidence }`, matching the local `ParsedReceipt`.
 - Compute confidence using the existing “sum ≈ printed total” tolerance if a
   total is available; otherwise return `"high"`.
 - Discard the image buffer.
@@ -487,7 +490,8 @@ New `useReceiptScan`:
 1. Crop/resize as today.
 2. If `navigator.onLine` is false → on-device immediately.
 3. If the user chose “Scan on this device” → on-device.
-4. Otherwise `POST /api/ocr`.
+4. Otherwise `POST /api/ocr` with a resized/re-encoded copy (longest edge
+   ~1800px, JPEG). The on-device fallback always receives the original crop.
 5. On `2xx` → `replaceFromScan(result)`.
 6. On network error, `5xx`, or timeout → run the existing `useReceiptOcr`
    fallback and show a notice.

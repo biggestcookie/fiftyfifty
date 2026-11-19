@@ -92,9 +92,8 @@ function onContinue() {
 const photoInput = ref<HTMLInputElement | null>(null);
 const libraryInput = ref<HTMLInputElement | null>(null);
 const scanPreviewUrl = ref<string | null>(null);
-const scanStatus = ref<
-  "idle" | "preparing" | "downloading" | "reading" | "done" | "error"
->("idle");
+/** When true, skip the server and scan on this device. */
+const onDeviceOnly = ref(false);
 /**
  * True when the camera permission is denied at the OS level. Triggers the
  * "Camera access blocked" banner so the user knows why the camera path is
@@ -136,20 +135,62 @@ type ScanNotice =
   | { kind: "error"; message: string };
 const scanNotice = ref<ScanNotice | null>(null);
 
-const scanner = useReceiptOcr();
+const scanner = useReceiptScan();
 
-const isScanSupported = computed(() => scanner.isSupported.value === true);
-const scanSupportUnknown = computed(() => scanner.isSupported.value === null);
+const {
+  status: scanStatus,
+  source: scanSource,
+  fellBack: scanFellBack,
+  deviceSupported,
+} = scanner;
+
+const scanPrivacyLine = computed(() =>
+  onDeviceOnly.value
+    ? "Scanned on this device — the photo never leaves your phone."
+    : "Receipt photos are sent to our server and Google Gemini for scanning. Images are not stored."
+);
 
 const scanStatusLabel = computed(() => {
   if (scanStatus.value === "preparing") return "Preparing scanner…";
+  if (scanStatus.value === "uploading")
+    return "Scanning receipt on our server…";
   if (scanStatus.value === "downloading") return "Downloading scanner…";
   if (scanStatus.value === "reading") return "Reading receipt…";
-  if (scanStatus.value === "done") return "Receipt scanned";
+  if (scanStatus.value === "done")
+    return scanSource.value === "device"
+      ? "Receipt scanned on this device"
+      : "Receipt scanned";
   if (scanStatus.value === "error")
     return "Scan failed — items below unchanged";
   return "";
 });
+
+const scanMenuItems = computed(() => [
+  {
+    label: "Take photo",
+    icon: "i-lucide-camera",
+    onSelect: () => openPhotoPicker(),
+  },
+  {
+    label: "Choose from library",
+    icon: "i-lucide-image",
+    onSelect: () => openLibraryPicker(),
+  },
+  { type: "separator" as const },
+  {
+    label:
+      deviceSupported.value === false
+        ? "Scan on this device (unsupported)"
+        : "Scan on this device",
+    icon: "i-lucide-smartphone",
+    type: "checkbox" as const,
+    checked: onDeviceOnly.value,
+    disabled: deviceSupported.value === false,
+    onUpdateChecked: (checked: boolean) => {
+      onDeviceOnly.value = checked;
+    },
+  },
+]);
 
 function openPhotoPicker() {
   // Re-check permission so the banner updates if the user unblocked since
@@ -229,7 +270,7 @@ async function onFileSelected(event: Event) {
   // Open the crop modal instead of scanning directly; the cropped blob comes
   // back through onCroppedForScan once the user confirms.
   scanNotice.value = null;
-  scanStatus.value = "idle";
+  scanner.reset();
   scanStore.openModal(file, origin);
   // Reset the input so re-selecting the same file fires change again.
   input.value = "";
@@ -244,12 +285,13 @@ async function onCroppedForScan(blob: Blob) {
   if (scanPreviewUrl.value) URL.revokeObjectURL(scanPreviewUrl.value);
   scanPreviewUrl.value = URL.createObjectURL(blob);
   scanNotice.value = null;
-  scanStatus.value = "preparing";
   try {
-    await scanner.warmup();
-    scanStatus.value = "reading";
-    const parsed = await scanner.scan(blob);
-    console.info("receipt ocr: parsed", parsed);
+    // Server-first unless the user explicitly chose on-device scanning. The
+    // cropper has already produced the final crop; only the upload copy is
+    // resized/re-encoded inside useReceiptScan.
+    const parsed = await scanner.scan(blob, {
+      mode: onDeviceOnly.value ? "device" : "auto",
+    });
     draft.replaceFromScan({
       items: parsed.items,
       fees: parsed.fees,
@@ -258,18 +300,16 @@ async function onCroppedForScan(blob: Blob) {
       parsed.confidence === "low"
         ? { kind: "low-confidence", confidence: "low" }
         : { kind: "success", confidence: "high" };
-    scanStatus.value = "done";
   } catch (e) {
     console.error("receipt scan failed", e);
-    // Generic actionable copy per UX plan: every recoverable error gets
-    // "try again" + "enter manually". Per-error classification can layer
-    // on later if more granular copy is needed.
+    // Every recoverable error offers "try again" + "enter manually". The
+    // composable supplies specific copy for 4xx/unsupported failures.
     scanNotice.value = {
       kind: "error",
       message:
+        scanner.error.value ??
         "Couldn't read that receipt — hold it flat and try again, or enter items manually.",
     };
-    scanStatus.value = "error";
   }
 }
 
@@ -279,7 +319,7 @@ function undoScan() {
     URL.revokeObjectURL(scanPreviewUrl.value);
     scanPreviewUrl.value = null;
   }
-  scanStatus.value = "idle";
+  scanner.reset();
   scanNotice.value = null;
 }
 
@@ -345,18 +385,7 @@ onBeforeUnmount(() => {
         </UAlert>
 
         <UDropdownMenu
-          :items="[
-            {
-              label: 'Take photo',
-              icon: 'i-lucide-camera',
-              onSelect: () => openPhotoPicker(),
-            },
-            {
-              label: 'Choose from library',
-              icon: 'i-lucide-image',
-              onSelect: () => openLibraryPicker(),
-            },
-          ]"
+          :items="scanMenuItems"
           :ui="{ content: 'min-w-[14rem]' }"
         >
           <UButton
@@ -365,19 +394,15 @@ onBeforeUnmount(() => {
             color="primary"
             block
             class="min-h-[44px] justify-between"
-            :disabled="!isScanSupported"
-            :title="
-              !isScanSupported && !scanSupportUnknown
-                ? 'Scanning is not supported on this browser'
-                : undefined
-            "
             trailing-icon="i-lucide-chevron-down"
             aria-label="Scan receipt"
           >
             <span class="flex flex-col items-start">
               <span>Scan receipt</span>
-              <span class="text-xs font-normal text-neutral-500 dark:text-neutral-400">
-                Scanned on this device — your receipt never leaves your phone.
+              <span
+                class="text-xs font-normal text-neutral-500 dark:text-neutral-400"
+              >
+                {{ scanPrivacyLine }}
               </span>
             </span>
           </UButton>
@@ -389,13 +414,6 @@ onBeforeUnmount(() => {
         >
           <p>Scan a receipt to fill in items automatically.</p>
         </div>
-
-        <p
-          v-if="scanner.isSupported.value === false"
-          class="text-sm text-neutral-500"
-        >
-          Receipt scanning is not supported on this browser.
-        </p>
 
         <div
           v-if="scanPreviewUrl"
@@ -439,7 +457,11 @@ onBeforeUnmount(() => {
           variant="soft"
           icon="i-lucide-scan-line"
           title="Items added from your receipt"
-          description="Double-check the entries — Scanning isn't perfect."
+          :description="
+            scanFellBack
+              ? `Couldn't reach the server — scanned on this device. Double-check the entries.`
+              : `Double-check the entries — Scanning isn't perfect.`
+          "
           close
           role="status"
           aria-live="polite"
@@ -458,6 +480,9 @@ onBeforeUnmount(() => {
           @update:open="(open: boolean) => { if (!open) dismissNotice(); }"
         >
           <template #description>
+            <p v-if="scanFellBack">
+              Couldn't reach the server — scanned on this device.
+            </p>
             <p>Scanning isn't perfect. For a better result next time:</p>
             <ul class="mt-2 list-disc space-y-1 pl-5 text-sm">
               <li>Use good, even lighting — avoid shadows on the receipt.</li>

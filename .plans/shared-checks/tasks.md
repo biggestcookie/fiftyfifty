@@ -245,32 +245,33 @@ risk because Netlify is the only builder.
 
 ## Phase 7 — Server OCR with on-device fallback
 
-- [ ] Add `server/api/ocr.post.ts`:
-  - [ ] Multipart parse; one image; 4 MB cap; content-type allowlist
-  - [ ] Base64 + Gemini `gemini-3.5-flash-lite`
-  - [ ] JSON response schema for `{ items, fees }`
-  - [ ] Validate/normalize: finite amounts, non-empty labels, drop blanks,
+- [x] Add `server/api/ocr.post.ts`:
+  - [x] Multipart parse; one image; 4 MB cap; content-type allowlist
+  - [x] Base64 + Gemini `gemini-3.5-flash-lite`
+  - [x] JSON response schema for `{ items, fees }` (model also reports the
+        printed total, used only for confidence)
+  - [x] Validate/normalize: finite amounts, non-empty labels, drop blanks,
         cap counts
-  - [ ] Confidence check against printed total when available
-  - [ ] Abort/timeout around 25s
-  - [ ] Discard the image; no Blobs write; no content logs
-  - [ ] `400` invalid image, `502/504` provider failure
-- [ ] Create `app/composables/useReceiptScan.ts`:
-  - [ ] Crop/resize as today
-  - [ ] Server-first when online and not explicitly on-device
-  - [ ] On network/5xx/timeout → existing `useReceiptOcr`
-  - [ ] Expose `source: "server" | "device"` and `fellBack` state
-  - [ ] Do not fall back on `4xx`
-- [ ] Update `app/pages/split/components/items.vue`:
-  - [ ] Use `useReceiptScan` instead of calling `useReceiptOcr` directly
-  - [ ] Add “Scan on this device” action to the scan menu
-  - [ ] Show server upload/read status
-  - [ ] Show fallback notice when applicable
-  - [ ] Update privacy copy for server vs on-device
-  - [ ] Preserve existing success, low-confidence, error, undo, and camera
+  - [x] Confidence check against printed total when available
+  - [x] Abort/timeout around 25s
+  - [x] Discard the image; no Blobs write; no content logs
+  - [x] `400` invalid image, `502/504` provider failure
+- [x] Create `app/composables/useReceiptScan.ts`:
+  - [x] Crop/resize as today (upload copy max 1800px JPEG; device keeps crop)
+  - [x] Server-first when online and not explicitly on-device
+  - [x] On network/5xx/timeout → existing `useReceiptOcr`
+  - [x] Expose `source: "server" | "device"` and `fellBack` state
+  - [x] Do not fall back on `4xx`
+- [x] Update `app/pages/split/components/items.vue`:
+  - [x] Use `useReceiptScan` instead of calling `useReceiptOcr` directly
+  - [x] Add “Scan on this device” action to the scan menu
+  - [x] Show server upload/read status
+  - [x] Show fallback notice when applicable
+  - [x] Update privacy copy for server vs on-device
+  - [x] Preserve existing success, low-confidence, error, undo, and camera
         permission behavior
-- [ ] Keep the local OCR worker/model assets; do not remove the fallback.
-- [ ] Remove/guard any raw OCR line logging that can contain PII.
+- [x] Keep the local OCR worker/model assets; do not remove the fallback.
+- [x] Remove/guard any raw OCR line logging that can contain PII.
 
 ## Phase 8 — Hardening, docs, and verification
 
@@ -475,3 +476,36 @@ risk because Netlify is the only builder.
   preview expired and recents showed “Link expired”; removing it cleared the
   store without touching the owner's check.
 - Typecheck and `bun test` (21) pass.
+
+### 2026-11-18 — Phase 7 (server OCR with on-device fallback)
+
+- Added `server/api/ocr.post.ts`: multipart parse with a single-image, 4 MB,
+  JPEG/PNG/WebP allowlist; in-memory base64 to Gemini
+  `gemini-3.5-flash-lite`; `responseMimeType: "application/json"` with an
+  explicit `responseSchema`; 25s abort; uniform `400/413/502/504` errors. The
+  image is never written or logged.
+- Confirmed against Netlify/Gemini docs: AI Gateway injects `GEMINI_API_KEY`
+  and `GOOGLE_GEMINI_BASE_URL`, which `new GoogleGenAI({})` reads directly;
+  `gemini-3.5-flash-lite` supports image input and structured outputs.
+- Model contract: `{ items: [{label, amount}], fees: [{label, amount}],
+  total? }`. `total` is the printed grand total and is used only to derive
+  confidence, never returned. The API returns `{ items, fees, confidence }`,
+  exactly `ParsedReceipt`. Normalization lives in
+  `server/utils/receipt-ocr.ts` and drops blank/zero/non-finite rows, clamps
+  labels, rounds to cents, and caps item/fee counts.
+- Confidence mirrors the local parser: `sum(items) + sum(fees)` vs the printed
+  total within 5 cents, compared in integer cents to avoid floating-point
+  boundary noise. No total → `high`.
+- Added `app/composables/useReceiptScan.ts`: cropped blob → resized JPEG upload
+  (longest edge 1800px, quality 0.9) → server. Network errors, timeouts, and
+  `5xx` fall back to the unchanged `useReceiptOcr` path with the original crop;
+  `4xx` shows an error and never rescans. Exposes `status`, `source`,
+  `fellBack`, and `error`.
+- Updated `items.vue`: crop modal still runs first; the scan menu gains a
+  “Scan on this device” checkbox (disabled when local OCR is unsupported);
+  button copy switches between server and on-device privacy text; status shows
+  “Scanning receipt on our server…”; success/low-confidence notices mention a
+  server fallback; the `"receipt ocr: parsed"` PII log is gone.
+- Added `test/receipt-ocr-normalize.test.ts` covering normalization,
+  malformed model rows, caps, printed totals, and confidence boundaries.
+- Typecheck, targeted ESLint, `bun test` (30), and build pass. Not committed.
