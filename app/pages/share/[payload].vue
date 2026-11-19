@@ -1,47 +1,11 @@
 <script setup lang="ts">
-import { Step, FeesMode, type Check } from "~/types/check";
-import { decodeCheck, type SharedCheckPayload } from "~/utils/share";
+import { Step, type Check } from "~/types/check";
+import { decodeCheck } from "~/utils/share";
+import { computeTotals } from "~~/shared/utils/check-totals";
 
 const route = useRoute();
 const router = useRouter();
 const checkStore = useCheckStore();
-
-// Intentionally mirrored from draft.ts finalize() so this page stays decoupled from the draft store.
-function computeTotals(data: SharedCheckPayload): Record<string, number> {
-  const totals: Record<string, number> = {};
-  for (const g of data.guests) totals[g.id] = 0;
-
-  const feesTotal = data.fees.reduce((sum, f) => sum + f.amount, 0);
-
-  if (data.feesMode === FeesMode.Equal) {
-    const extraPerGuest =
-      data.guests.length > 0 ? feesTotal / data.guests.length : 0;
-    for (const item of data.items) {
-      if (item.guestIds.length === 0) continue;
-      const share = item.amount / item.guestIds.length;
-      for (const gid of item.guestIds) {
-        totals[gid] = (totals[gid] ?? 0) + share;
-      }
-    }
-    for (const g of data.guests) {
-      totals[g.id] = (totals[g.id] ?? 0) + extraPerGuest;
-    }
-  } else {
-    const itemSubtotal = data.items.reduce((sum, item) => sum + item.amount, 0);
-    const scale =
-      itemSubtotal > 0 ? (itemSubtotal + feesTotal) / itemSubtotal : 1;
-
-    for (const item of data.items) {
-      if (item.guestIds.length === 0) continue;
-      const share = (item.amount * scale) / item.guestIds.length;
-      for (const gid of item.guestIds) {
-        totals[gid] = (totals[gid] ?? 0) + share;
-      }
-    }
-  }
-
-  return totals;
-}
 
 onMounted(async () => {
   try {

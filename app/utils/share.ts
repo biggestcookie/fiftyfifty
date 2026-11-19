@@ -1,4 +1,4 @@
-import type { Check } from "~/types/check";
+import type { Check, SharedCheck } from "~/types/check";
 
 const LEGACY_VERSION_PREFIX = "v1.";
 const VERSION_PREFIX = "v2.";
@@ -24,10 +24,7 @@ for (let i = 0; i < B64_ALPHABET.length; i++) {
   B64_LOOKUP[B64_ALPHABET.charAt(i)] = i;
 }
 
-export type SharedCheckPayload = Omit<
-  Check,
-  "id" | "createdAt" | "totals" | "updatedAt" | "currentStep"
->;
+export type SharedCheckPayload = SharedCheck;
 
 interface RequiredField {
   name: string;
