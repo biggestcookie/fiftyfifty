@@ -69,9 +69,8 @@ async function load() {
       totals: data.totals,
       currentStep: Step.Receipt,
     };
-    state.value = "ready";
-
     // Cache only a small, non-PII preview for the recipient's recents list.
+    // Save before rendering so navigating away immediately can't drop it.
     try {
       await putSharedCheckPreview({
         shareId: data.shareId,
@@ -91,6 +90,8 @@ async function load() {
     } catch {
       // Preview storage is best-effort; the live view still renders.
     }
+
+    state.value = "ready";
   } catch {
     state.value = "offline";
   }
