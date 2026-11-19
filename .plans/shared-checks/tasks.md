@@ -54,7 +54,8 @@ risk because Netlify is the only builder.
         (blocked on Phase 3).
 - Netlify Blobs needs **no dashboard toggle or separate enablement**:
   - [x] Add `@netlify/blobs` as a dependency.
-  - [ ] Call it from a Netlify Function with the injected context (Phase 2).
+  - [x] Call it from a Netlify Function with the injected context (Phase 2).
+        Verified on production: create/read/patch/delete all hit Blobs.
   - [x] Document that `netlify dev` provides local Blobs context and
         `nuxt dev` does not (`server/README.md`).
   - [x] Do not add `NETLIFY_AUTH_TOKEN`/site credentials to client code.
@@ -63,8 +64,8 @@ risk because Netlify is the only builder.
         runs them; unit tests should use the in-memory store.
 - [x] Verify the deployment serves a live API. Verified on the PR deploy
       preview.
-- [ ] Verify Blobs write/read once Phase 2 calls it; unit tests use the
-      in-memory store.
+- [x] Verify Blobs write/read once Phase 2 calls it; unit tests use the
+      in-memory store. Verified in production on 2026-11-18.
 
 ### Netlify MCP configuration check (2026-11-18)
 
@@ -370,3 +371,18 @@ risk because Netlify is the only builder.
 - `bun test` passes: 21 tests across 3 files.
 - Still unverified: the deployed function appearing in the Netlify functions
   list and a real run against Blobs.
+
+### 2026-11-18 — Phase 2/3 deploy verification
+
+- Pushed `c1cebfd` to `main`; the Netlify Git deploy picked it up in about a
+  minute.
+- Production smoke test against `https://splitfiftyfifty.netlify.app` (test
+  link revoked afterwards): create `201`, public read `200` with server totals,
+  bad token `403`, stale version `409`, patch `200` → version 2, payment handle
+  stripped by `includePayment: false`, delete `204`, read after delete `410`
+  (`revoked`).
+- `nuxt dev` now proxies `/api/*` to production via `nitro.devProxy`; a live
+  share was read through `localhost:3000` successfully.
+- Production home page loads with no console errors.
+- Still unverified: the scheduled `cleanup-expired` function in the Netlify
+  Functions list and a manual **Run now** execution.
