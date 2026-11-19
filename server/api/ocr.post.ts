@@ -166,21 +166,45 @@ export default defineEventHandler(async (event) => {
       );
     }
     payload = parsed as Record<string, unknown>;
-  } catch {
+  } catch (e) {
+    // TEMP DIAGNOSTICS — remove after the production check.
+    const err = e as {
+      name?: string;
+      message?: string;
+      status?: number;
+      cause?: { message?: string };
+    };
+    const clean = (value?: string) =>
+      value
+        ?.replace(/AIza[0-9A-Za-z_-]{10,}/g, "[redacted]")
+        .slice(0, 500);
     if (controller.signal.aborted) {
-      return apiError(
-        event,
-        504,
-        "ocr_timeout",
-        "The scanner took too long to respond."
-      );
+      return {
+        ...apiError(
+          event,
+          504,
+          "ocr_timeout",
+          "The scanner took too long to respond."
+        ),
+        debug: { aborted: true },
+      };
     }
-    return apiError(
-      event,
-      502,
-      "ocr_failed",
-      "The scanner could not read that receipt."
-    );
+    return {
+      ...apiError(
+        event,
+        502,
+        "ocr_failed",
+        "The scanner could not read that receipt."
+      ),
+      debug: {
+        name: err?.name,
+        message: clean(err?.message),
+        status: err?.status,
+        cause: clean(err?.cause?.message),
+        hasKey: Boolean(process.env.GEMINI_API_KEY),
+        hasBase: Boolean(process.env.GOOGLE_GEMINI_BASE_URL),
+      },
+    };
   } finally {
     clearTimeout(timer);
   }
