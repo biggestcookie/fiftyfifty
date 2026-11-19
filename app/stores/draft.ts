@@ -7,6 +7,7 @@ import {
   type Fee,
   type Item,
 } from "~/types/check";
+import { computeTotals } from "~~/shared/utils/check-totals";
 
 function emptyDraft(): Draft {
   return {
@@ -223,37 +224,7 @@ export const useDraftStore = defineStore("draft", {
     async finalize(): Promise<Check | null> {
       if (!this.draft) return null;
       const d = this.draft;
-      const totals: Record<string, number> = {};
-      for (const g of d.guests) totals[g.id] = 0;
-
-      const feesTotal = d.fees.reduce((sum, f) => sum + f.amount, 0);
-
-      if (d.feesMode === FeesMode.Equal) {
-        const extraPerGuest =
-          d.guests.length > 0 ? feesTotal / d.guests.length : 0;
-        for (const item of d.items) {
-          if (item.guestIds.length === 0) continue;
-          const share = item.amount / item.guestIds.length;
-          for (const gid of item.guestIds) {
-            totals[gid] = (totals[gid] ?? 0) + share;
-          }
-        }
-        for (const g of d.guests) {
-          totals[g.id] = (totals[g.id] ?? 0) + extraPerGuest;
-        }
-      } else {
-        const itemSubtotal = d.items.reduce((s, i) => s + i.amount, 0);
-        const scale =
-          itemSubtotal > 0 ? (itemSubtotal + feesTotal) / itemSubtotal : 1;
-
-        for (const item of d.items) {
-          if (item.guestIds.length === 0) continue;
-          const share = (item.amount * scale) / item.guestIds.length;
-          for (const gid of item.guestIds) {
-            totals[gid] = (totals[gid] ?? 0) + share;
-          }
-        }
-      }
+      const totals = computeTotals(d);
 
       const checkStore = useCheckStore();
       const id = this.editingCheckId ?? uid();
