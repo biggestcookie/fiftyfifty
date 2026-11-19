@@ -521,3 +521,15 @@ risk because Netlify is the only builder.
 - This is configuration, not code: enable Netlify AI features/AI Gateway for
   the site (or set a Gemini API key in the site env) to activate the server
   path. Until then the server-first design degrades exactly as intended.
+
+### 2026-11-19 — Gemini key + transient 503 retry
+
+- Added a personal `GEMINI_API_KEY` to the Netlify production environment.
+  The deployed function now reaches Gemini directly and returns correct
+  `{ items, fees, confidence }` results (verified with a synthetic receipt:
+  Pizza 20 + Iced Tea 3 + Tax 2 → `high`).
+- The remaining failures are Google-side transient `503 UNAVAILABLE` ("model
+  is currently experiencing high demand") for `gemini-3.5-flash-lite`.
+- `POST /api/ocr` now retries `429`/`503` once after 700ms before returning
+  `502`, still inside the 25s abort budget. The client falls back to device
+  OCR if both attempts fail.

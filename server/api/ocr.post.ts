@@ -16,6 +16,9 @@ const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 const TIMEOUT_MS = 25_000;
 const MAX_ITEMS = 80;
 const MAX_FEES = 12;
+const MAX_ATTEMPTS = 2;
+const RETRY_DELAY_MS = 700;
+const RETRYABLE_STATUS = new Set([429, 503]);
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 const PROMPT = `You extract line items and fees from a photo of a printed receipt.
@@ -69,6 +72,12 @@ const responseSchema: Schema = {
   },
   required: ["items", "fees"],
 };
+
+function providerStatus(error: unknown): number | undefined {
+  if (typeof error !== "object" || error === null) return undefined;
+  const { status } = error as { status?: unknown };
+  return typeof status === "number" ? status : undefined;
+}
 
 export default defineEventHandler(async (event) => {
   setResponseHeader(event, "cache-control", "no-store");
@@ -128,83 +137,81 @@ export default defineEventHandler(async (event) => {
 
   let payload: Record<string, unknown> | null = null;
   try {
-    const response = await ai.models.generateContent({
-      model: MODEL,
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { inlineData: { mimeType, data: image.data.toString("base64") } },
-            { text: PROMPT },
+    // Gemini occasionally returns a transient 503 under load. One retry
+    // usually clears it; after that the client falls back to device OCR.
+    for (let attempt = 1; ; attempt++) {
+      try {
+        const response = await ai.models.generateContent({
+          model: MODEL,
+          contents: [
+            {
+              role: "user",
+              parts: [
+                {
+                  inlineData: {
+                    mimeType,
+                    data: image.data.toString("base64"),
+                  },
+                },
+                { text: PROMPT },
+              ],
+            },
           ],
-        },
-      ],
-      config: {
-        responseMimeType: "application/json",
-        responseSchema,
-        abortSignal: controller.signal,
-      },
-    });
+          config: {
+            responseMimeType: "application/json",
+            responseSchema,
+            abortSignal: controller.signal,
+          },
+        });
 
-    const { text } = response;
-    if (!text) {
-      return apiError(
-        event,
-        502,
-        "ocr_empty",
-        "The scanner could not read that receipt."
-      );
-    }
+        const { text } = response;
+        if (!text) {
+          return apiError(
+            event,
+            502,
+            "ocr_empty",
+            "The scanner could not read that receipt."
+          );
+        }
 
-    const parsed: unknown = JSON.parse(text);
-    if (typeof parsed !== "object" || parsed === null) {
-      return apiError(
-        event,
-        502,
-        "ocr_failed",
-        "The scanner could not read that receipt."
-      );
+        const parsed: unknown = JSON.parse(text);
+        if (typeof parsed !== "object" || parsed === null) {
+          return apiError(
+            event,
+            502,
+            "ocr_failed",
+            "The scanner could not read that receipt."
+          );
+        }
+        payload = parsed as Record<string, unknown>;
+        break;
+      } catch (error) {
+        const status = providerStatus(error);
+        if (
+          attempt >= MAX_ATTEMPTS ||
+          !status ||
+          !RETRYABLE_STATUS.has(status)
+        ) {
+          throw error;
+        }
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+      }
     }
-    payload = parsed as Record<string, unknown>;
-  } catch (e) {
-    // TEMP DIAGNOSTICS — remove after the production check.
-    const err = e as {
-      name?: string;
-      message?: string;
-      status?: number;
-      cause?: { message?: string };
-    };
-    const clean = (value?: string) =>
-      value
-        ?.replace(/AIza[0-9A-Za-z_-]{10,}/g, "[redacted]")
-        .slice(0, 500);
+  } catch {
     if (controller.signal.aborted) {
-      return {
-        ...apiError(
-          event,
-          504,
-          "ocr_timeout",
-          "The scanner took too long to respond."
-        ),
-        debug: { aborted: true },
-      };
-    }
-    return {
-      ...apiError(
+      return apiError(
         event,
-        502,
-        "ocr_failed",
-        "The scanner could not read that receipt."
-      ),
-      debug: {
-        name: err?.name,
-        message: clean(err?.message),
-        status: err?.status,
-        cause: clean(err?.cause?.message),
-        hasKey: Boolean(process.env.GEMINI_API_KEY),
-        hasBase: Boolean(process.env.GOOGLE_GEMINI_BASE_URL),
-      },
-    };
+        504,
+        "ocr_timeout",
+        "The scanner took too long to respond."
+      );
+    }
+    return apiError(
+      event,
+      502,
+      "ocr_failed",
+      "The scanner could not read that receipt."
+    );
   } finally {
     clearTimeout(timer);
   }
