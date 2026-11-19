@@ -3,6 +3,7 @@ import { Step, type Check } from "~/types/check";
 export function useSplitFlow() {
   const draft = useDraftStore();
   const router = useRouter();
+  const { syncSharedCheck } = useCheckShare();
 
   function start(step: Step = Step.Guests) {
     draft.start();
@@ -21,7 +22,13 @@ export function useSplitFlow() {
 
   async function finalize() {
     const check = await draft.finalize();
-    if (check) await router.push(`/checks/${check.id}`);
+    if (!check) return;
+
+    // Local save is the source of truth; push the projection to the server
+    // without blocking navigation.
+    if (check.share) void syncSharedCheck(check);
+
+    await router.push(`/checks/${check.id}`);
   }
 
   return { start, gotoStep, edit, finalize };

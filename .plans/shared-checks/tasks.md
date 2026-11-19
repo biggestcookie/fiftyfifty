@@ -169,38 +169,39 @@ risk because Netlify is the only builder.
 
 ## Phase 4 — Owner sharing client
 
-- [ ] Add `share?: ShareRef` to the `Check` type; include
+- [x] Add `share?: ShareRef` to the `Check` type; include
       `sharedWithPayment` in `ShareRef` and set it on create/re-share.
-- [ ] Add `checkStore.updateShare(id, patch)` and `checkStore.clearShare(id)`
+      (Already defined in Phase 1; confirmed complete.)
+- [x] Add `checkStore.updateShare(id, patch)` and `checkStore.clearShare(id)`
       actions that persist to IndexedDB.
-- [ ] Refactor `app/utils/share.ts`:
-  - [ ] Keep legacy `encodeCheck`/`decodeCheck`/`buildShareUrl` for old links.
-  - [ ] Move shared-check types to `shared/types/check.ts`.
-  - [ ] Add `buildSharedCheckUrl(shareId)` → `${origin}/s/${shareId}`.
-- [ ] Refactor `app/composables/useShareCheck.ts`:
-  - [ ] Create a share via `POST /api/checks`
-  - [ ] Reuse an active share URL without a network call
-  - [ ] Share/copy the short URL using `navigator.share`/clipboard
-  - [ ] Remove the new-share “too large” path (legacy only)
-- [ ] Create `app/composables/useCheckShare.ts`:
-  - [ ] `isShareActive(check)`, `isShareExpired(check)`
-  - [ ] `syncSharedCheck(check)` (PATCH + pending/expired handling)
-  - [ ] `retryPendingSync(check)`
-  - [ ] `createNewShare(check, { includePayment })`
-  - [ ] `revokeShare(check)`
-- [ ] Update `useSplitFlow.finalize()`:
-  - [ ] Save local check first
-  - [ ] Fire `syncSharedCheck(check)` without blocking navigation
-- [ ] Update `app/pages/checks/[id].vue`:
-  - [ ] Show share status (active with expiry, expired, not shared)
-  - [ ] Share button creates/reuses/creates-new as appropriate
-  - [ ] QR uses the short URL; remove payload-length errors for new shares
-  - [ ] Retry pending sync on mount and on `online`
-  - [ ] On `410`, show “shared link expired” and preserve local copy
-  - [ ] Remove the `[CHECK_RECEIPT]` console log
-- [ ] Update check deletion:
-  - [ ] Best-effort `DELETE /api/checks/:id` before removing the local check
-  - [ ] Continue local deletion if offline
+- [x] Refactor `app/utils/share.ts`:
+  - [x] Keep legacy `encodeCheck`/`decodeCheck`/`buildShareUrl` for old links.
+  - [x] Move shared-check types to `shared/types/check.ts`.
+  - [x] Add `buildSharedCheckUrl(shareId)` → `${origin}/s/${shareId}`.
+- [x] Refactor `app/composables/useShareCheck.ts`:
+  - [x] Create a share via `POST /api/checks`
+  - [x] Reuse an active share URL without a network call
+  - [x] Share/copy the short URL using `navigator.share`/clipboard
+  - [x] Remove the new-share “too large” path (legacy only)
+- [x] Create `app/composables/useCheckShare.ts`:
+  - [x] `isShareActive(check)`, `isShareExpired(check)`
+  - [x] `syncSharedCheck(check)` (PATCH + pending/expired handling)
+  - [x] `retryPendingSync(check)`
+  - [x] `createNewShare(check, { includePayment })`
+  - [x] `revokeShare(check)`
+- [x] Update `useSplitFlow.finalize()`:
+  - [x] Save local check first
+  - [x] Fire `syncSharedCheck(check)` without blocking navigation
+- [x] Update `app/pages/checks/[id].vue`:
+  - [x] Show share status (active with expiry, expired, not shared)
+  - [x] Share button creates/reuses/creates-new as appropriate
+  - [x] QR uses the short URL; remove payload-length errors for new shares
+  - [x] Retry pending sync on mount and on `online`
+  - [x] On `410`, show “shared link expired” and preserve local copy
+  - [x] Remove the `[CHECK_RECEIPT]` console log
+- [x] Update check deletion:
+  - [x] Best-effort `DELETE /api/checks/:id` before removing the local check
+  - [x] Continue local deletion if offline
 
 ## Phase 5 — Expired re-share payment prompt
 
@@ -386,3 +387,28 @@ risk because Netlify is the only builder.
 - Production home page loads with no console errors.
 - Still unverified: the scheduled `cleanup-expired` function in the Netlify
   Functions list and a manual **Run now** execution.
+
+### 2026-11-18 — Phase 4 (owner sharing client)
+
+- `useShareCheck` now creates/reuses a server-backed `/s/<shareId>` link,
+  persists `ShareRef` (ID + edit token + expiry + version +
+  `sharedWithPayment`) in IndexedDB, and keeps the legacy payload path only
+  for old `/share/...` links.
+- Added `useCheckShare` with active/expired checks, create-new, PATCH sync
+  (409 refetch+retry, 410/403 → expired, network → `pendingSync`),
+  pending retry, and best-effort revoke.
+- `draft.finalize()` preserves `share` across edits, and
+  `useSplitFlow.finalize()` saves locally first, then fires the PATCH without
+  blocking navigation.
+- The check page shows Not shared / active-with-expiry / pending / expired
+  status, reuses the short link for QR, retries pending sync on mount and
+  `online`, and drops the `[CHECK_RECEIPT]` log. Deleting a recent check
+  best-effort revokes the server link first.
+- Verified in the browser against the live API through the dev proxy: share
+  created (`201`), status shows active for 7 days, QR reuses the link without
+  a second POST, `share` survives a finalize, and deleting the local check
+  sends `DELETE` (`204`); the server then returns `410 revoked`.
+- Full UI edit → PATCH sync wasn't exercised because page/enter animations
+  pause in the automation window; share preservation and the PATCH endpoint
+  were verified separately.
+- `bun test` 21 pass; typecheck and build pass.

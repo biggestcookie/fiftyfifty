@@ -227,11 +227,11 @@ export const useDraftStore = defineStore("draft", {
       const totals = computeTotals(d);
 
       const checkStore = useCheckStore();
+      const existing = this.editingCheckId
+        ? await checkStore.loadById(this.editingCheckId)
+        : undefined;
       const id = this.editingCheckId ?? uid();
-      const createdAt = this.editingCheckId
-        ? (await checkStore.loadById(this.editingCheckId))?.createdAt ??
-          Date.now()
-        : Date.now();
+      const createdAt = existing?.createdAt ?? Date.now();
 
       const check: Check = {
         id,
@@ -247,6 +247,8 @@ export const useDraftStore = defineStore("draft", {
         name: d.name,
         venmoHandle: d.venmoHandle,
         zelleHandle: d.zelleHandle,
+        // Preserve the shared-link metadata across edits.
+        share: existing?.share,
       };
 
       await checkStore.add(check);

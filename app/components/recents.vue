@@ -2,6 +2,7 @@
 import type { Check } from "~/types/check";
 
 const checkStore = useCheckStore();
+const { revokeShare } = useCheckShare();
 const confirmingId = ref<string | null>(null);
 
 const checks = computed(() =>
@@ -45,6 +46,9 @@ function itemLabels(check: Check): string[] {
 }
 
 async function onDelete(id: string) {
+  const check = checkStore.checks.find((c) => c.id === id);
+  // Best effort; the local check is deleted even when offline.
+  if (check) await revokeShare(check);
   await checkStore.remove(id);
   confirmingId.value = null;
 }

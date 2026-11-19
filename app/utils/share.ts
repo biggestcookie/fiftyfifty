@@ -247,9 +247,7 @@ export async function decodeCheck(
   }
 
   if (payload.startsWith(VERSION_PREFIX_GZIP)) {
-    const bytes = base64UrlToBytes(
-      payload.slice(VERSION_PREFIX_GZIP.length)
-    );
+    const bytes = base64UrlToBytes(payload.slice(VERSION_PREFIX_GZIP.length));
     const decompressed = await decompress(bytes, "gzip");
     const json = new TextDecoder().decode(decompressed);
     const short = JSON.parse(json) as ShortPayload;
@@ -272,9 +270,7 @@ export async function decodeCheck(
  * The new shape has independent `venmoHandle` / `zelleHandle` fields, so
  * translate the legacy pair here before the check reaches the UI.
  */
-function migrateLegacyPayment(
-  payload: SharedCheckPayload
-): SharedCheckPayload {
+function migrateLegacyPayment(payload: SharedCheckPayload): SharedCheckPayload {
   const legacy = (payload as unknown as Record<string, unknown>).paymentMethod;
   const handle = (payload as unknown as Record<string, unknown>).paymentHandle;
   if (typeof legacy !== "string" || typeof handle !== "string") {
@@ -303,4 +299,25 @@ function validateSharedPayload(value: unknown): SharedCheckPayload {
 
 export function buildShareUrl(payload: string): string {
   return `${window.location.origin}/share/${payload}`;
+}
+
+export function buildSharedCheckUrl(shareId: string): string {
+  return `${window.location.origin}/s/${shareId}`;
+}
+
+/**
+ * Strip owner-only and client-only fields before sending a check to the API.
+ * The server rejects unknown fields, so this list must match `SharedCheck`.
+ */
+export function toSharedCheck(check: Check): SharedCheck {
+  const {
+    id: _id,
+    createdAt: _createdAt,
+    updatedAt: _updatedAt,
+    totals: _totals,
+    currentStep: _currentStep,
+    share: _share,
+    ...shared
+  } = check;
+  return shared;
 }

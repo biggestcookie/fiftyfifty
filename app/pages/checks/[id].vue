@@ -3,7 +3,7 @@ import QRCode from "qrcode-svg";
 import type { Check, Guest, Item } from "~/types/check";
 import { openVenmoWithFallback, tryZelleScheme } from "~/utils/payment";
 import { formatZelleHandle } from "~/utils/zelle";
-import { buildShareUrl, encodeCheck } from "~/utils/share";
+import { buildSharedCheckUrl } from "~/utils/share";
 
 const route = useRoute();
 const router = useRouter();
@@ -11,15 +11,17 @@ const checkStore = useCheckStore();
 const uiStore = useUiStore();
 const flow = useSplitFlow();
 const { share, isSharing } = useShareCheck();
+const { isShareExpired, ensureShare, retryPendingSync } = useCheckShare();
 
 function onEdit() {
   if (!check.value) return;
   flow.edit(check.value);
 }
 
-function onShare() {
+async function onShare() {
   if (!check.value) return;
-  share(check.value);
+  const updated = await share(check.value);
+  if (updated) check.value = updated;
 }
 
 const qrOpen = ref(false);
@@ -34,17 +36,17 @@ async function onToggleQr() {
   }
   qrError.value = null;
   try {
-    const payload = await encodeCheck(check.value);
-    const url = buildShareUrl(payload);
+    // QR always encodes the short server link; create one when needed.
+    const updated = await ensureShare(check.value);
+    check.value = updated;
+    if (!updated.share) throw new Error("Missing share");
+
+    const url = buildSharedCheckUrl(updated.share.shareId);
     qrSvg.value = new QRCode({ content: url, width: 200, height: 200 }).svg();
     qrOpen.value = true;
-  } catch (error) {
+  } catch {
     qrError.value =
-      error instanceof Error && /too long|too large|overflow/i.test(error.message)
-        ? "Check is too large to share as a QR code."
-        : "Couldn't generate QR code. Try sharing the link instead.";
-    // eslint-disable-next-line no-console
-    console.error("[QR_ERROR]", error);
+      "Couldn't create a share link. Check your connection and try again.";
   }
 }
 
@@ -61,6 +63,46 @@ const createdAtText = computed(() => {
     timeStyle: "short",
   });
 });
+
+type ShareTone = "neutral" | "warning" | "success" | "error";
+
+const shareStatus = computed<{ label: string; tone: ShareTone }>(() => {
+  const share = check.value?.share;
+  if (!share) return { label: "Not shared", tone: "neutral" };
+  if (share.pendingSync) {
+    return { label: "Changes waiting to sync", tone: "warning" };
+  }
+  if (share.expiresAt <= Date.now()) {
+    return { label: "Shared link expired", tone: "error" };
+  }
+
+  // Small tolerance for server/client clock skew so a fresh 7-day link
+  // doesn't read as 8 days.
+  const days = Math.max(
+    1,
+    Math.ceil((share.expiresAt - Date.now() - 60_000) / 86_400_000)
+  );
+  return {
+    label: `Shared link active · expires in ${days} day${
+      days === 1 ? "" : "s"
+    }`,
+    tone: "success",
+  };
+});
+
+const shareStatusClass = computed(
+  () =>
+    ({
+      neutral: "text-neutral-500",
+      warning: "text-warning-600",
+      success: "text-success-600",
+      error: "text-error-600",
+    }[shareStatus.value.tone])
+);
+
+const shareButtonLabel = computed(() =>
+  check.value?.share && isShareExpired(check.value) ? "Share again" : "Share"
+);
 
 interface GuestItem {
   item: Item;
@@ -199,7 +241,10 @@ const paymentNote = computed(() => {
 
 const payButtonLabel = computed(() => {
   if (!check.value) return "";
-  const amount = formatCurrency(selectedTotal.value, check.value.currencySymbol);
+  const amount = formatCurrency(
+    selectedTotal.value,
+    check.value.currencySymbol
+  );
   if (paymentModalMethod.value === "venmo" && check.value.venmoHandle) {
     return `Pay ${amount} to ${check.value.venmoHandle} on Venmo`;
   }
@@ -259,8 +304,17 @@ onMounted(async () => {
     return;
   }
   check.value = loaded;
-  // eslint-disable-next-line no-console
-  console.log("[CHECK_RECEIPT]", JSON.stringify(loaded, null, 2));
+
+  if (loaded.share?.pendingSync) {
+    const updated = await retryPendingSync(loaded);
+    if (updated) check.value = updated;
+  }
+});
+
+useEventListener(window, "online", async () => {
+  if (!check.value?.share?.pendingSync) return;
+  const updated = await retryPendingSync(check.value);
+  if (updated) check.value = updated;
 });
 </script>
 
@@ -333,7 +387,11 @@ onMounted(async () => {
 
       <UModal
         v-model:open="paymentModalOpen"
-        :title="zelleCopyState ? 'Couldn\u2019t open Zelle link' : 'Who are you paying for?'"
+        :title="
+          zelleCopyState
+            ? 'Couldn\u2019t open Zelle link'
+            : 'Who are you paying for?'
+        "
       >
         <template #body>
           <!-- Zelle scheme-failed fallback. Replaces the body in place
@@ -351,7 +409,9 @@ onMounted(async () => {
               :key="breakdown.guest.id"
               :model-value="selectedGuestIds.has(breakdown.guest.id)"
               :label="breakdown.displayName"
-              :description="formatCurrency(breakdown.total, check?.currencySymbol ?? '$')"
+              :description="
+                formatCurrency(breakdown.total, check?.currencySymbol ?? '$')
+              "
               class="min-h-[44px]"
               @update:model-value="toggleGuestSelected(breakdown.guest.id)"
             />
@@ -409,7 +469,7 @@ onMounted(async () => {
           @click="onEdit"
         />
         <UButton
-          label="Share"
+          :label="shareButtonLabel"
           variant="ghost"
           color="neutral"
           icon="i-lucide-share-2"
@@ -427,6 +487,10 @@ onMounted(async () => {
           @click="onToggleQr"
         />
       </div>
+
+      <p class="mt-2 text-center text-xs" :class="shareStatusClass">
+        {{ shareStatus.label }}
+      </p>
 
       <div
         v-if="qrError"
@@ -446,10 +510,7 @@ onMounted(async () => {
         class="mt-4 flex flex-col items-center gap-3"
       >
         <!-- eslint-disable-next-line vue/no-v-html -->
-        <div
-          class="bg-white p-2 rounded-lg"
-          v-html="qrSvg"
-        />
+        <div class="bg-white p-2 rounded-lg" v-html="qrSvg" />
         <UButton
           label="Close"
           variant="ghost"

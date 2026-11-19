@@ -1,33 +1,30 @@
 import type { Check } from "~/types/check";
-import { buildShareUrl, encodeCheck } from "~/utils/share";
+import { buildSharedCheckUrl } from "~/utils/share";
 
 export function useShareCheck() {
   const toast = useToast();
+  const { ensureShare } = useCheckShare();
   const isSharing = ref(false);
 
-  async function share(check: Check): Promise<void> {
+  /**
+   * Reuse the active short link or create a new server-backed one, then hand
+   * it to the native share sheet or clipboard.
+   */
+  async function share(check: Check): Promise<Check | null> {
     isSharing.value = true;
     try {
-      let payload: string;
-      try {
-        payload = await encodeCheck(check);
-      } catch {
-        toast.add({
-          title: "Check too large to share",
-          description: "Try removing some items.",
-          color: "warning",
-        });
-        return;
-      }
+      const updated = await ensureShare(check);
+      if (!updated.share) return null;
 
-      const url = buildShareUrl(payload);
+      const url = buildSharedCheckUrl(updated.share.shareId);
 
       if (navigator.share) {
         try {
           await navigator.share({ url });
-          return;
+          return updated;
         } catch {
-          // Share sheet unavailable, cancelled (AbortError), or failed — fall through to clipboard.
+          // Share sheet unavailable, cancelled (AbortError), or failed —
+          // fall through to the clipboard.
         }
       }
 
@@ -40,11 +37,20 @@ export function useShareCheck() {
         });
       } catch {
         toast.add({
-          title: "Couldn't share automatically",
-          description: "Copy the URL from your address bar.",
+          title: "Couldn't copy the link",
+          description: "Open the QR code to share instead.",
           color: "warning",
         });
       }
+
+      return updated;
+    } catch {
+      toast.add({
+        title: "Couldn't create a share link",
+        description: "Check your connection and try again.",
+        color: "error",
+      });
+      return null;
     } finally {
       isSharing.value = false;
     }
