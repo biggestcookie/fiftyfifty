@@ -71,20 +71,22 @@ risk because Netlify is the only builder.
 - Project `splitfiftyfifty`, site ID
   `e55da5d7-61fe-407e-899d-7e6f8f013e1c`,
   `https://splitfiftyfifty.netlify.app`.
-- Latest production deploy is `8b9d564` on `main` (not this branch); it has
-  no functions. The earlier production deploy `a49cce6` matched HEAD at the
-  start of this work and was built with the old `generate` path.
+- Latest production deploy is `6afe4751718cf7b3707285c1` on `main`
+  (merge commit `2320e74`), `ready`, and includes the Nuxt `server` function.
+  The pre-merge deploy `8b9d564` had no functions; `a49cce6` was the old
+  `generate` path.
 - Site env vars: only `NITRO_PRESET=netlify`. No `GEMINI_API_KEY` yet
   (Phase 7). Team env vars: none.
 - Blobs region: `us-east-2`.
 
-### Deploy preview check (2026-11-18)
+### Deploy verification (2026-11-18)
 
-- PR #1 (`feature/shared-checks`), commit `b4d66fa`.
-- Deploy `6afe457afffea6928b29887d`: `ready`, context `deploy-preview`.
-- `available_functions` includes the Nuxt `server` function.
-- `GET /api/health` → `200 {"ok":true}`.
-- `GET /200.html` → `200`; `GET /` → `200`.
+- PR #1 (`feature/shared-checks`) was merged straight into `main` as merge
+  commit `2320e74`; the PR is closed.
+- Production deploy `6afe4751718cf7b3707285c1`: `ready`, branch `main`,
+  commit `2320e74`; `available_functions` includes the Nuxt `server` function.
+- `GET /api/health` → `200 {"ok":true}` on production.
+- `GET /200.html` → `200`; `GET /` → `200` on production.
 - The first preview (`675757f`) failed: `publish` was `.output/public`, but the
   Nitro netlify preset emits client assets to `dist/`. Fixed in `b4d66fa`.
 
@@ -326,9 +328,9 @@ risk because Netlify is the only builder.
 - Shared types live in `shared/types/check.ts`; totals live in
   `shared/utils/check-totals.ts` and are used by `draft.finalize()` and the
   legacy share page. `bun test` passes (6 tests).
-- Verified on the PR #1 deploy preview: `/api/health` → `200 {"ok":true}`,
-  `/200.html` → `200`, and the `server` function is packaged. The first
-  preview failed because `publish` pointed at `.output/public`; Nitro's
-  netlify preset emits client assets to `dist/`.
-- Not yet verified: `netlify dev` Blobs context, live Blobs read/write, and
-  production (PR #1 is not merged).
+- Verified on the PR #1 deploy preview and then production after merging:
+  `/api/health` → `200 {"ok":true}`, `/200.html` → `200`, and the `server`
+  function is packaged. The first preview failed because `publish` pointed at
+  `.output/public`; Nitro's netlify preset emits client assets to `dist/`.
+- Merged `feature/shared-checks` into `main` as `2320e74`; PR #1 is closed.
+- Not yet verified: `netlify dev` Blobs context and live Blobs read/write.
