@@ -12,10 +12,11 @@ these API routes.
 ## Deployment
 
 Netlify's Git integration owns deploys. A push to the production branch runs
-the `netlify.toml` build (`bun run build`) and publishes `.output/public`. Do
-**not** use `bun run generate` for this variant — it produces a static site
-without the runtime `/api` routes. There is no GitHub Actions deployment; the
-old GitHub Pages workflow is retired.
+the `netlify.toml` build (`bun run build`) and publishes `dist`. The Nitro
+netlify preset emits client assets to `dist/` and the API function to
+`.netlify/functions-internal`. Do **not** use `bun run generate` for this
+variant — it produces a static site without the runtime `/api` routes. There
+is no GitHub Actions deployment; the old GitHub Pages workflow is retired.
 
 The Netlify CLI is used locally for `netlify dev` (Blobs/API work), not for
 deployment. Run it under **Node**, not Bun: `netlify-cli` crashes when run by

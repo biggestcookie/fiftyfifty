@@ -1,11 +1,12 @@
 "$schema" = "https://open-api.netlify.com/netlify.schema.json"
 
 # Deployment is owned by Netlify's Git integration: a push to the production
-# branch runs `bun run build` (not `bun run generate`) and publishes
-# `.output/public`. `ssr: false` in nuxt.config.ts keeps pages client-rendered.
+# branch runs `bun run build` (not `bun run generate`) and publishes `dist`.
+# The Nitro netlify preset emits client assets to `dist/` and the API function
+# to `.netlify/functions-internal`; `ssr: false` keeps pages client-rendered.
 [build]
   command = "bun run build"
-  publish = ".output/public"
+  publish = "dist"
 
 [build.environment]
   # This repo uses `bun.lock` (not `bun.lockb`). Pin the version so Netlify's
