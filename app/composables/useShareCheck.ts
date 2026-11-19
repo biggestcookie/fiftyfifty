@@ -10,10 +10,13 @@ export function useShareCheck() {
    * Reuse the active short link or create a new server-backed one, then hand
    * it to the native share sheet or clipboard.
    */
-  async function share(check: Check): Promise<Check | null> {
+  async function share(
+    check: Check,
+    options: { includePayment?: boolean } = {}
+  ): Promise<Check | null> {
     isSharing.value = true;
     try {
-      const updated = await ensureShare(check);
+      const updated = await ensureShare(check, options);
       if (!updated.share) return null;
 
       const url = buildSharedCheckUrl(updated.share.shareId);

@@ -74,10 +74,27 @@ export function useCheckShare() {
     return updated;
   }
 
-  /** Reuse an active share without a network call; otherwise create one. */
-  async function ensureShare(check: Check): Promise<Check> {
+  /**
+   * Reuse an active share without a network call; otherwise create one.
+   * `includePayment` only matters when a new link is created.
+   */
+  async function ensureShare(
+    check: Check,
+    options: { includePayment?: boolean } = {}
+  ): Promise<Check> {
     if (isShareActive(check)) return check;
-    return createNewShare(check, { includePayment: true });
+    return createNewShare(check, options);
+  }
+
+  /**
+   * A re-share needs the payment prompt only when the previous link expired
+   * and payment details were involved — either still stored locally or
+   * recorded on the last share.
+   */
+  function needsPaymentPrompt(check: Check): boolean {
+    const { share } = check;
+    if (!share || share.expiresAt > Date.now()) return false;
+    return share.sharedWithPayment || hasPaymentHandle(check);
   }
 
   /**
@@ -184,6 +201,7 @@ export function useCheckShare() {
   return {
     isShareActive,
     isShareExpired,
+    needsPaymentPrompt,
     createNewShare,
     ensureShare,
     syncSharedCheck,

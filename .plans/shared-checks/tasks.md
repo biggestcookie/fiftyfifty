@@ -205,21 +205,21 @@ risk because Netlify is the only builder.
 
 ## Phase 5 — Expired re-share payment prompt
 
-- [ ] Add prompt state to `useCheckShare` or the check page:
-  - [ ] `open`, `includePayment`, `venmoHandle`, `zelleHandle`
-- [ ] Trigger only when the share is expired and the local check has a
+- [x] Add prompt state to `useCheckShare` or the check page:
+  - [x] `open`, `includePayment`, `venmoHandle`, `zelleHandle`
+- [x] Trigger only when the share is expired and the local check has a
       Venmo/Zelle handle or the previous share recorded `sharedWithPayment`.
-- [ ] Prefill from the local check; allow editing.
-- [ ] On confirm:
-  - [ ] Persist edited handles locally
-  - [ ] `POST /api/checks` with `includePayment`
-  - [ ] Replace local `share` metadata with the new ID/token/expiry and
+- [x] Prefill from the local check; allow editing.
+- [x] On confirm:
+  - [x] Persist edited handles locally
+  - [x] `POST /api/checks` with `includePayment`
+  - [x] Replace local `share` metadata with the new ID/token/expiry and
         `sharedWithPayment: includePayment && handlePresent`
-  - [ ] Share the new URL
-- [ ] On “share without payment details”:
-  - [ ] Send `includePayment: false`; keep local handles untouched
-- [ ] If no handles exist, skip the prompt and create a new share.
-- [ ] Old URL must remain expired; assert no reuse of the old `shareId`.
+  - [x] Share the new URL
+- [x] On “share without payment details”:
+  - [x] Send `includePayment: false`; keep local handles untouched
+- [x] If no handles exist, skip the prompt and create a new share.
+- [x] Old URL must remain expired; assert no reuse of the old `shareId`.
 
 ## Phase 6 — Recipient view
 
@@ -412,3 +412,25 @@ risk because Netlify is the only builder.
   pause in the automation window; share preservation and the PATCH endpoint
   were verified separately.
 - `bun test` 21 pass; typecheck and build pass.
+
+### 2026-11-18 — Phase 5 (expired re-share payment prompt)
+
+- Expired shares now open a `UModal` prompt when the local check has a
+  Venmo/Zelle handle or the previous share recorded `sharedWithPayment`.
+  Venmo/Zelle fields are prefilled and editable; both Share and QR route
+  through the prompt.
+- `useCheckShare` exposes `needsPaymentPrompt()`; `ensureShare()` accepts
+  `includePayment`. Choosing "Create link with payment details" persists the
+  edited handles locally and creates the new share with payment details;
+  "Share without payment details" sends `includePayment: false` and leaves the
+  local handles untouched.
+- Verified against the live API by revoking a share and marking the local copy
+  expired:
+  - without payment: new ID, server copy has no `venmoHandle`, local handle
+    kept, `sharedWithPayment: false`, old URL `410`;
+  - with payment: edited handle persisted, server copy includes it,
+    `sharedWithPayment: true`, another new ID, previous URL `410`.
+- No handles and no prior payment flag still creates a link immediately with
+  no prompt.
+- Typecheck, `bun test` (21), and build pass. Test links were revoked and local
+  test checks removed.

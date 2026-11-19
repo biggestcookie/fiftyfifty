@@ -2,7 +2,7 @@
 import QRCode from "qrcode-svg";
 import type { Check, Guest, Item } from "~/types/check";
 import { openVenmoWithFallback, tryZelleScheme } from "~/utils/payment";
-import { formatZelleHandle } from "~/utils/zelle";
+import { formatZelleHandle, normalizeZelleHandle } from "~/utils/zelle";
 import { buildSharedCheckUrl } from "~/utils/share";
 
 const route = useRoute();
@@ -11,7 +11,8 @@ const checkStore = useCheckStore();
 const uiStore = useUiStore();
 const flow = useSplitFlow();
 const { share, isSharing } = useShareCheck();
-const { isShareExpired, ensureShare, retryPendingSync } = useCheckShare();
+const { isShareExpired, needsPaymentPrompt, ensureShare, retryPendingSync } =
+  useCheckShare();
 
 function onEdit() {
   if (!check.value) return;
@@ -20,6 +21,10 @@ function onEdit() {
 
 async function onShare() {
   if (!check.value) return;
+  if (needsPaymentPrompt(check.value)) {
+    openSharePrompt("share");
+    return;
+  }
   const updated = await share(check.value);
   if (updated) check.value = updated;
 }
@@ -28,6 +33,16 @@ const qrOpen = ref(false);
 const qrError = ref<string | null>(null);
 const qrSvg = ref<string>("");
 
+async function showQr(target: Check, includePayment: boolean) {
+  const updated = await ensureShare(target, { includePayment });
+  check.value = updated;
+  if (!updated.share) throw new Error("Missing share");
+
+  const url = buildSharedCheckUrl(updated.share.shareId);
+  qrSvg.value = new QRCode({ content: url, width: 200, height: 200 }).svg();
+  qrOpen.value = true;
+}
+
 async function onToggleQr() {
   if (!check.value) return;
   if (qrOpen.value) {
@@ -35,18 +50,84 @@ async function onToggleQr() {
     return;
   }
   qrError.value = null;
+  if (needsPaymentPrompt(check.value)) {
+    openSharePrompt("qr");
+    return;
+  }
   try {
     // QR always encodes the short server link; create one when needed.
-    const updated = await ensureShare(check.value);
-    check.value = updated;
-    if (!updated.share) throw new Error("Missing share");
-
-    const url = buildSharedCheckUrl(updated.share.shareId);
-    qrSvg.value = new QRCode({ content: url, width: 200, height: 200 }).svg();
-    qrOpen.value = true;
+    await showQr(check.value, true);
   } catch {
     qrError.value =
       "Couldn't create a share link. Check your connection and try again.";
+  }
+}
+
+type SharePromptTarget = "share" | "qr";
+
+const sharePromptOpen = ref(false);
+const sharePromptTarget = ref<SharePromptTarget>("share");
+const sharePromptVenmo = ref("");
+const sharePromptZelle = ref("");
+const sharePromptBusy = ref(false);
+const sharePromptHasHandle = computed(
+  () =>
+    sharePromptVenmo.value.trim().length > 0 ||
+    sharePromptZelle.value.trim().length > 0
+);
+
+function openSharePrompt(target: SharePromptTarget) {
+  if (!check.value) return;
+  sharePromptTarget.value = target;
+  sharePromptVenmo.value = check.value.venmoHandle ?? "";
+  sharePromptZelle.value = check.value.zelleHandle ?? "";
+  sharePromptOpen.value = true;
+}
+
+/** Persist only when the owner chose to include payment details. */
+async function persistPromptHandles(current: Check): Promise<Check> {
+  const venmo = sharePromptVenmo.value.trim().replace(/^@/, "");
+  const zelle = normalizeZelleHandle(sharePromptZelle.value);
+
+  const next: Check = { ...current };
+  if (venmo) next.venmoHandle = venmo;
+  else delete next.venmoHandle;
+  if (zelle) next.zelleHandle = zelle;
+  else delete next.zelleHandle;
+
+  await checkStore.add(next);
+  return next;
+}
+
+async function onConfirmSharePrompt(includePayment: boolean) {
+  if (!check.value || sharePromptBusy.value) return;
+  sharePromptBusy.value = true;
+
+  try {
+    let target = check.value;
+    if (includePayment) {
+      target = await persistPromptHandles(target);
+      check.value = target;
+    }
+
+    if (sharePromptTarget.value === "qr") {
+      try {
+        await showQr(target, includePayment);
+      } catch {
+        qrError.value =
+          "Couldn't create a share link. Check your connection and try again.";
+      }
+      sharePromptOpen.value = false;
+      return;
+    }
+
+    const updated = await share(target, { includePayment });
+    // Keep the prompt open on failure so the user can retry.
+    if (!updated) return;
+    check.value = updated;
+    sharePromptOpen.value = false;
+  } finally {
+    sharePromptBusy.value = false;
   }
 }
 
@@ -449,6 +530,74 @@ useEventListener(window, "online", async () => {
               variant="ghost"
               block
               @click="paymentModalOpen = false"
+            />
+          </div>
+        </template>
+      </UModal>
+
+      <UModal v-model:open="sharePromptOpen" title="Share a new link?">
+        <template #body>
+          <div class="flex flex-col gap-4">
+            <p class="text-sm text-neutral-600 dark:text-neutral-400">
+              Your previous share link expired. Include payment details in the
+              new link?
+            </p>
+
+            <UFormField label="Venmo">
+              <UInput
+                v-model="sharePromptVenmo"
+                placeholder="Username (no @)"
+                type="text"
+                autocomplete="off"
+                class="w-full"
+              />
+            </UFormField>
+
+            <UFormField label="Zelle">
+              <UInput
+                v-model="sharePromptZelle"
+                placeholder="Email or phone number"
+                type="email"
+                autocomplete="off"
+                class="w-full"
+              />
+            </UFormField>
+
+            <p class="text-xs text-neutral-500">
+              Sharing without payment details leaves your saved handles
+              untouched.
+            </p>
+          </div>
+        </template>
+        <template #footer>
+          <div class="flex flex-col gap-2 w-full">
+            <UButton
+              label="Create link with payment details"
+              color="primary"
+              size="lg"
+              block
+              class="min-h-[44px]"
+              :loading="sharePromptBusy"
+              :disabled="sharePromptBusy || !sharePromptHasHandle"
+              @click="onConfirmSharePrompt(true)"
+            />
+            <UButton
+              label="Share without payment details"
+              color="neutral"
+              variant="ghost"
+              block
+              class="min-h-[44px]"
+              :disabled="sharePromptBusy"
+              @click="onConfirmSharePrompt(false)"
+            />
+            <UButton
+              label="Cancel"
+              color="neutral"
+              variant="ghost"
+              block
+              class="min-h-[44px]"
+              :disabled="sharePromptBusy"
+              @click="sharePromptOpen = false"
             />
           </div>
         </template>
