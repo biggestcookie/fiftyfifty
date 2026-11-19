@@ -5,8 +5,25 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+/**
+ * Minimal, non-PII preview of a check shared with this device. It powers the
+ * recipient's recent-checks list; the live server copy is always fetched when
+ * the entry is opened. No guest names, guest IDs, payment handles, or full
+ * check data are stored here.
+ */
+export interface SharedCheckPreview {
+  shareId: string;
+  createdAt: number;
+  expiresAt: number;
+  name?: string;
+  guestCount: number;
+  currencySymbol: string;
+  total: number;
+  itemLabels: string[];
+}
+
 const DB_NAME = "fiftyfifty";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbPromise: Promise<IDBPDatabase> | null = null;
 
@@ -16,6 +33,9 @@ export function getDb(): Promise<IDBPDatabase> {
       upgrade(db) {
         if (!db.objectStoreNames.contains("checks")) {
           db.createObjectStore("checks", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("sharedChecks")) {
+          db.createObjectStore("sharedChecks", { keyPath: "shareId" });
         }
       },
     });
@@ -60,4 +80,37 @@ export async function putCheck(check: Check): Promise<void> {
 export async function deleteCheck(id: string): Promise<void> {
   const db = await getDb();
   await db.delete("checks", id);
+}
+
+export async function getAllSharedCheckPreviews(): Promise<
+  SharedCheckPreview[]
+> {
+  const db = await getDb();
+  return (await db.getAll("sharedChecks")) as SharedCheckPreview[];
+}
+
+export async function putSharedCheckPreview(
+  preview: SharedCheckPreview
+): Promise<void> {
+  const db = await getDb();
+  await db.put("sharedChecks", clone(preview));
+}
+
+export async function deleteSharedCheckPreview(shareId: string): Promise<void> {
+  const db = await getDb();
+  await db.delete("sharedChecks", shareId);
+}
+
+/**
+ * Reflect a server 410 in the local preview so recents can mark it expired.
+ * The preview is intentionally kept: an expired link stays in the recipient's
+ * recent-checks list until they remove it themselves.
+ */
+export async function markSharedCheckExpired(shareId: string): Promise<void> {
+  const db = await getDb();
+  const existing = (await db.get("sharedChecks", shareId)) as
+    | SharedCheckPreview
+    | undefined;
+  if (!existing || existing.expiresAt === 0) return;
+  await db.put("sharedChecks", { ...existing, expiresAt: 0 });
 }

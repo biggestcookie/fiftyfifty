@@ -11,8 +11,10 @@ Replace the self-contained `/share/<payload>` link with a short, server-backed
 - **No receipt images are stored**, ever. OCR runs on the image in memory and
   immediately discards it.
 - The owner keeps the local copy in IndexedDB and is the source of truth.
-- Recipients read the current server copy. They **do not** store a local copy
-  and do not get offline access to a shared check.
+- Recipients read the current server copy. They keep only a small **non-PII
+  preview** (share ID, name, total, item labels, guest count, currency,
+  expiry) for their recent-checks list, and do not get offline access to the
+  check itself.
 - Shared state expires **7 days after the last edit** (sliding). There is no
   promise that data is physically deleted exactly at the 7-day mark; deletion
   happens on read and in a daily cleanup.
@@ -50,8 +52,11 @@ Replace the self-contained `/share/<payload>` link with a short, server-backed
   read-only check view.
 - The recipient can use the Venmo/Zelle payment buttons from the shared check.
 - No edit, share, or QR controls.
-- No local copy is written to IndexedDB. The server is authoritative on every
-  visit.
+- Only a non-PII preview is cached locally so the check appears in Recent
+  checks. Guest names, guest IDs, payment handles, guest assignments, and the
+  full check are never stored. The server is authoritative on every visit;
+  opening the entry always re-fetches `/api/checks/:id` and shows the live
+  expired/revoked state when relevant.
 - Expired link: “This shared check expired. Ask your host to share it again.”
 - Unknown link: “Couldn’t find this check! Ask your host to share it again.”
 - Offline/unreachable: “Couldn’t load this shared check. Check your connection
@@ -85,9 +90,11 @@ Replace the self-contained `/share/<payload>` link with a short, server-backed
   removed on read and by a daily cleanup.
 - **Tombstone:** expired/revoked documents are replaced with a tombstone that
   contains no check data, receipt data, or PII.
-- **Recipients:** server-only; no IndexedDB copy, no service-worker API cache.
+- **Recipients:** server-only for check data; a non-PII preview is cached for
+  recents, no service-worker API cache.
 - **Owner:** local copy is canonical; edits are patched to the server.
-- **No PII caching:** no recipient cache, no API response caching, no logging
+- **No PII caching:** recipient previews exclude guest names, guest IDs,
+  payment handles, and guest assignments; no API response caching, no logging
   check bodies or raw OCR text.
 - **Payment prompt:** only when re-sharing an expired link that has at least
   one Venmo/Zelle handle locally.
@@ -116,7 +123,7 @@ Owner device                              Netlify
   └─ patch server (best effort) ──────────►│    verify edit token + version
                                            │    update doc, slide expiresAt
 Recipient /s/:id ── GET ──────────────────►│
-  └─ render read-only, no IDB              ├─ GET expired → tombstone, 410
+  └─ read-only + non-PII preview           ├─ GET expired → tombstone, 410
                                            ├─ daily cleanup function
                                            └─ POST /api/ocr → Gemini
                                                 (image discarded)
@@ -157,8 +164,8 @@ Recipient /s/:id ── GET ─────────────────�
    routes, expiry/tombstone, cleanup function, a deployed smoke test.
 2. **Owner sharing** — `share` metadata on local checks, Share/QR flow, status,
    patch-on-finalize, pending retry.
-3. **Recipient view** — `/s/[id]`, read-only check view, no IDB, expired/404
-   states; keep legacy `/share/[payload]`.
+3. **Recipient view** — `/s/[id]`, read-only check view, non-PII recent preview,
+   expired/404 states; keep legacy `/share/[payload]`.
 4. **Expired re-share prompt** — Venmo/Zelle confirmation, new ID creation.
 5. **Server OCR** — `/api/ocr`, server-first composable, on-device fallback,
    privacy copy.

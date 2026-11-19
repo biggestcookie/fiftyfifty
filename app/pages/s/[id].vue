@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Step, type Check, type SharedCheck } from "~/types/check";
+import { markSharedCheckExpired, putSharedCheckPreview } from "~/utils/db";
 
 interface SharedCheckResponse {
   shareId: string;
@@ -41,6 +42,11 @@ async function load() {
         error?: { code?: string };
       } | null;
       state.value = body?.error?.code === "revoked" ? "revoked" : "expired";
+      try {
+        await markSharedCheckExpired(id);
+      } catch {
+        // Preview storage is best-effort.
+      }
       return;
     }
 
@@ -64,6 +70,27 @@ async function load() {
       currentStep: Step.Receipt,
     };
     state.value = "ready";
+
+    // Cache only a small, non-PII preview for the recipient's recents list.
+    try {
+      await putSharedCheckPreview({
+        shareId: data.shareId,
+        createdAt: data.createdAt ?? data.updatedAt,
+        expiresAt: data.expiresAt,
+        name: data.check.name,
+        guestCount: data.check.guests.length,
+        currencySymbol: data.check.currencySymbol,
+        total: Object.values(data.totals).reduce(
+          (sum, value) => sum + value,
+          0
+        ),
+        itemLabels: data.check.items
+          .map((item) => item.label.trim())
+          .filter((label) => label.length > 0),
+      });
+    } catch {
+      // Preview storage is best-effort; the live view still renders.
+    }
   } catch {
     state.value = "offline";
   }

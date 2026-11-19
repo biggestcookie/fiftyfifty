@@ -111,8 +111,11 @@ Page: `/s/<shareId>`.
 - Read-only rendering of the check: total, receipt entries, guest breakdowns,
   Venmo/Zelle payment actions.
 - No **Edit check**, **Share**, or **QR** buttons.
-- No “saved to this device” messaging.
-- No IndexedDB write; no local copy.
+- A small non-PII preview (name, total, item labels, guest count, expiry) is
+  saved locally so the check appears in Recent checks. Guest names, payment
+  handles, guest assignments, and the full check are not stored.
+- Opening the recent entry always re-fetches the live server copy; no cached
+  check body is rendered.
 - Refreshing the page re-fetches the server copy.
 
 ### Loading
@@ -148,8 +151,8 @@ Include a “Go home” button.
 > Check your connection and try again.
 > [Retry]
 
-No cached fallback. This is intentional: recipients do not keep a local copy
-of a shared receipt.
+No cached fallback for the check itself. The local recent preview is display
+metadata only and is never rendered as a check when the server is unreachable.
 
 ### Malformed / invalid link
 

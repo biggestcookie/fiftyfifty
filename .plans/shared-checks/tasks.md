@@ -233,7 +233,8 @@ risk because Netlify is the only builder.
 - [x] Create `app/pages/s/[id].vue`:
   - [x] Fetch `GET /api/checks/:id`
   - [x] Render `CheckView` read-only
-  - [x] No `checkStore.add`, no IndexedDB write, no local persistence
+  - [x] No `checkStore.add`; only a non-PII recent preview is persisted
+        (share ID, name, total, item labels, guest count, currency, expiry)
   - [x] `410` → expired message
   - [x] `404` → not-found message
   - [x] network failure → offline error with retry
@@ -442,8 +443,9 @@ risk because Netlify is the only builder.
   Owner-only actions live in the `actions` slot; the return-home link is in the
   `footer` slot, so the recipient page simply omits both.
 - Added `app/pages/s/[id].vue`: fetches `GET /api/checks/:id`, renders
-  `CheckView`, writes nothing to IndexedDB, and has loading skeleton,
-  expired/revoked `410`, not-found `404`, and offline-with-retry states.
+  `CheckView`, has loading skeleton, expired/revoked `410`, not-found `404`,
+  and offline-with-retry states. It now also caches a non-PII recent preview
+  (see the linked-checks entry below).
 - Added `createdAt` to the shared-check GET response (falls back to
   `updatedAt` while an older server deploy is live).
 - Verified through the live API in the browser: totals ($26), guest breakdowns,
@@ -452,3 +454,24 @@ risk because Netlify is the only builder.
   revoked links show the revoked state. The owner page still renders and
   shares correctly after the extraction.
 - Typecheck, targeted ESLint, `bun test` (21), and build pass.
+
+### 2026-11-18 — Linked checks in recipient recents
+
+- Recipients now see shared checks in **Recent checks**. A new `sharedChecks`
+  IndexedDB store (DB version 2) holds only a non-PII preview: `shareId`,
+  `name`, `total`, item labels, guest count, currency, `createdAt`, and
+  `expiresAt`. Guest names, guest IDs, payment handles, guest assignments, and
+  the full check are never stored.
+- `/s/:id` upserts the preview after a successful load and marks it expired on
+  a server `410` without deleting it: expired links stay in Recent checks until
+  the recipient removes them. Every recent entry links to `/s/:id`, so opening
+  it always re-fetches the live copy and shows the current
+  expired/revoked/offline state.
+- Recents merges owner and linked checks by creation time. Linked rows show a
+  “Shared” badge, drop to “Link expired” once the link is dead, and use
+  “Remove” (local preview only) instead of “Delete”.
+- Verified in the browser: the stored preview had no guests/handles/full check;
+  home listed the linked check next to a local one; a revoked link marked the
+  preview expired and recents showed “Link expired”; removing it cleared the
+  store without touching the owner's check.
+- Typecheck and `bun test` (21) pass.

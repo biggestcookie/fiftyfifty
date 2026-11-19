@@ -436,8 +436,13 @@ When the owner deletes a local check with an active share:
 3. `410` → expired/revoked message.
 4. `404` → not-found message.
 5. Network failure → offline error with retry.
-6. **Never** call `checkStore.add`, `putCheck`, or write to IndexedDB.
-7. Do not persist the response in Pinia beyond the current page lifetime.
+6. **Never** call `checkStore.add` or `putCheck`; never store the full check.
+7. Save only a non-PII `SharedCheckPreview` (share ID, name, total, item
+   labels, guest count, currency, creation/expiry timestamps) to the
+   `sharedChecks` IndexedDB store for the recipient's recents list. Clicking
+   the entry always re-fetches `/api/checks/:id`; no guest names, guest IDs,
+   payment handles, guest assignments, or check bodies are cached.
+8. Do not persist the response in Pinia beyond the current page lifetime.
 
 Refactor the presentation out of `app/pages/checks/[id].vue` into a shared
 component (e.g. `app/components/CheckView.vue`) so the owner page and the
@@ -609,7 +614,8 @@ Integration with fake store:
 
 Manual (Netlify dev + three browsers/devices):
 
-- Owner shares; recipient opens `/s/:id`; recipient IndexedDB has no check.
+- Owner shares; recipient opens `/s/:id`; recipient IndexedDB has only a
+  non-PII preview (no guests, handles, assignments, or full check).
 - Owner edits; recipient refreshes and sees new totals.
 - Recipient never sees Edit/Share/QR.
 - Offline owner edit → local save + pending sync; online retry patches.

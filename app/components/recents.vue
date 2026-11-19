@@ -1,13 +1,28 @@
 <script setup lang="ts">
 import type { Check } from "~/types/check";
+import {
+  deleteSharedCheckPreview,
+  getAllSharedCheckPreviews,
+  type SharedCheckPreview,
+} from "~/utils/db";
 
 const checkStore = useCheckStore();
 const { revokeShare } = useCheckShare();
-const confirmingId = ref<string | null>(null);
+const confirmingKey = ref<string | null>(null);
+const sharedPreviews = ref<SharedCheckPreview[]>([]);
 
-const checks = computed(() =>
-  [...checkStore.checks].sort((a, b) => b.createdAt - a.createdAt)
-);
+interface RecentRow {
+  key: string;
+  kind: "owner" | "shared";
+  /** Local check id for owners, share id for linked checks. */
+  id: string;
+  title: string;
+  currencySymbol: string;
+  total: number;
+  itemLabels: string[];
+  createdAt: number;
+  expired: boolean;
+}
 
 const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
 
@@ -35,34 +50,83 @@ function formatRelative(timestamp: number): string {
   return rtf.format(Math.round(diff), "second");
 }
 
-function grandTotal(check: Check): number {
-  return Object.values(check.totals).reduce((sum, value) => sum + value, 0);
-}
-
-function itemLabels(check: Check): string[] {
+function ownerItemLabels(check: Check): string[] {
   return check.items
     .map((item) => item.label.trim())
     .filter((label) => label.length > 0);
 }
 
-async function onDelete(id: string) {
-  const check = checkStore.checks.find((c) => c.id === id);
-  // Best effort; the local check is deleted even when offline.
-  if (check) await revokeShare(check);
-  await checkStore.remove(id);
-  confirmingId.value = null;
+function sharedTitle(preview: SharedCheckPreview): string {
+  const name = preview.name?.trim();
+  if (name) return name;
+  const count = preview.guestCount;
+  return `Check with ${count} ${count === 1 ? "person" : "people"}`;
+}
+
+const rows = computed<RecentRow[]>(() => {
+  const ownerRows: RecentRow[] = checkStore.checks.map((check) => ({
+    key: `owner:${check.id}`,
+    kind: "owner",
+    id: check.id,
+    title: checkName(check),
+    currencySymbol: check.currencySymbol,
+    total: Object.values(check.totals).reduce((sum, value) => sum + value, 0),
+    itemLabels: ownerItemLabels(check),
+    createdAt: check.createdAt,
+    expired: false,
+  }));
+
+  const sharedRows: RecentRow[] = sharedPreviews.value.map((preview) => ({
+    key: `shared:${preview.shareId}`,
+    kind: "shared",
+    id: preview.shareId,
+    title: sharedTitle(preview),
+    currencySymbol: preview.currencySymbol,
+    total: preview.total,
+    itemLabels: preview.itemLabels,
+    createdAt: preview.createdAt,
+    expired: preview.expiresAt <= Date.now(),
+  }));
+
+  return [...ownerRows, ...sharedRows].sort(
+    (a, b) => b.createdAt - a.createdAt
+  );
+});
+
+onMounted(async () => {
+  try {
+    sharedPreviews.value = await getAllSharedCheckPreviews();
+  } catch {
+    sharedPreviews.value = [];
+  }
+});
+
+async function onDelete(row: RecentRow) {
+  if (row.kind === "owner") {
+    const check = checkStore.checks.find((c) => c.id === row.id);
+    // Best effort; the local check is deleted even when offline.
+    if (check) await revokeShare(check);
+    await checkStore.remove(row.id);
+  } else {
+    // Removing a linked preview never touches the owner's server copy.
+    await deleteSharedCheckPreview(row.id);
+    sharedPreviews.value = sharedPreviews.value.filter(
+      (preview) => preview.shareId !== row.id
+    );
+  }
+  confirmingKey.value = null;
 }
 </script>
 
 <template>
   <UCard title="Recent checks">
-    <div v-if="checks.length === 0" class="text-sm text-neutral-500">
+    <div v-if="rows.length === 0" class="text-sm text-neutral-500">
       No recent checks!
     </div>
     <div v-else class="flex flex-col gap-2">
       <div
-        v-for="(check, index) in checks"
-        :key="check.id"
+        v-for="(row, index) in rows"
+        :key="row.key"
         v-motion
         :initial="{ opacity: 0, x: -12 }"
         :enter="{
@@ -73,42 +137,58 @@ async function onDelete(id: string) {
         class="flex items-center gap-2"
       >
         <NuxtLink
-          :to="`/checks/${check.id}`"
+          :to="row.kind === 'owner' ? `/checks/${row.id}` : `/s/${row.id}`"
           class="flex-1 grid grid-cols-[1fr_auto] items-center gap-3 p-3 hover:bg-neutral-50 dark:hover:bg-neutral-900 rounded-lg min-h-[44px]"
         >
           <div class="flex flex-col gap-1 min-w-0">
-            <span class="font-semibold truncate">
-              {{ checkName(check) }}
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="font-semibold truncate">
+                {{ row.title }}
+              </span>
+              <UBadge
+                v-if="row.kind === 'shared'"
+                label="Shared"
+                color="neutral"
+                variant="soft"
+                size="sm"
+                class="shrink-0"
+              />
+            </div>
+            <span
+              v-if="row.kind === 'shared' && row.expired"
+              class="text-xs text-error-600"
+            >
+              Link expired
             </span>
             <span
-              v-if="itemLabels(check).length > 0"
+              v-else-if="row.itemLabels.length > 0"
               class="text-xs text-neutral-400 truncate"
             >
-              {{ itemLabels(check).slice(0, 2).join(", ")
-              }}<template v-if="itemLabels(check).length > 2"
-                >, {{ itemLabels(check).length - 2 }} more items</template
+              {{ row.itemLabels.slice(0, 2).join(", ")
+              }}<template v-if="row.itemLabels.length > 2"
+                >, {{ row.itemLabels.length - 2 }} more items</template
               >
             </span>
           </div>
 
           <div class="flex flex-col items-end gap-0.5 whitespace-nowrap">
             <span class="font-semibold">
-              {{ formatCurrency(grandTotal(check), check.currencySymbol) }}
+              {{ formatCurrency(row.total, row.currencySymbol) }}
             </span>
             <span class="text-sm text-neutral-500">
-              {{ formatRelative(check.createdAt) }}
+              {{ formatRelative(row.createdAt) }}
             </span>
           </div>
         </NuxtLink>
 
         <UButton
-          v-if="confirmingId !== check.id"
+          v-if="confirmingKey !== row.key"
           icon="i-lucide-trash"
           variant="ghost"
           color="error"
           size="sm"
           class="min-h-[44px] min-w-[44px]"
-          @click="confirmingId = check.id"
+          @click="confirmingKey = row.key"
         />
         <div v-else class="flex gap-1">
           <UButton
@@ -116,14 +196,14 @@ async function onDelete(id: string) {
             size="sm"
             variant="ghost"
             class="min-h-[44px]"
-            @click="confirmingId = null"
+            @click="confirmingKey = null"
           />
           <UButton
-            label="Delete"
+            :label="row.kind === 'shared' ? 'Remove' : 'Delete'"
             size="sm"
             color="error"
             class="min-h-[44px]"
-            @click="onDelete(check.id)"
+            @click="onDelete(row)"
           />
         </div>
       </div>
