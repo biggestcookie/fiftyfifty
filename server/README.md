@@ -8,6 +8,13 @@ these API routes.
 
 - `GET /api/health` — returns `{ "ok": true }`. Use it to confirm the Nitro
   function is live after a deploy.
+- `POST /api/checks` — create a shared check; returns the one-time edit token.
+- `GET /api/checks/:id` — public read; `404` unknown, `410` expired/revoked.
+- `PATCH /api/checks/:id` — owner update; `Authorization: Bearer <editToken>`.
+- `DELETE /api/checks/:id` — owner revoke; `Authorization: Bearer <editToken>`.
+
+Status codes, validation rules, and the storage layout are documented in
+`server/api/README.md`.
 
 ## Deployment
 
@@ -26,7 +33,10 @@ Bun (`enableCompileCache` returns null).
 
 - **Client-only work:** `bun run dev` (`nuxt dev`) is fine. It runs the Nitro
   dev server too, but it has no Netlify runtime context, so Netlify Blobs calls
-  will fail locally.
+  will fail locally. To work around that, `nitro.devProxy` in `nuxt.config.ts`
+  forwards `/api/*` to the production deployment, so local client work talks to
+  the live functions and Blobs. Requests therefore create/revoke **real**
+  production shares; use `netlify dev` when you need an isolated local store.
 - **Server/API work:** use `netlify dev`. It injects the Netlify Blobs context
   (no dashboard toggle or extra credentials are needed locally) and routes
   `/api/*` through the Netlify runtime.

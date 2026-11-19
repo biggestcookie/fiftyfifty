@@ -5,6 +5,7 @@
 .nitro
 .cache
 .plans
+.netlify
 dist
 
 # Node dependencies

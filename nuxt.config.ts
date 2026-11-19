@@ -43,6 +43,16 @@ export default defineNuxtConfig({
   },
   nitro: {
     preset: "netlify",
+    // Dev-server only: send `/api/*` to the deployed site so local client work
+    // uses the live Netlify Functions and Blobs. Production builds ignore
+    // `devProxy`; deploys still run the real server routes.
+    devProxy: {
+      "/api": {
+        // The dev server strips the `/api` mount prefix, so include it here.
+        target: "https://splitfiftyfifty.netlify.app/api",
+        changeOrigin: true,
+      },
+    },
   },
   routeRules: {
     // Long-lived cache for the OCR model assets. Non-PWA users without a

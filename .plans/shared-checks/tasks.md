@@ -108,63 +108,63 @@ risk because Netlify is the only builder.
 
 ## Phase 2 — Server storage and API
 
-- [ ] Create `shared/server/check-store.ts`:
-  - [ ] `CHECKS_PREFIX = "checks/"`
-  - [ ] `getStore({ name: "fiftyfifty", consistency: "strong" })`
-  - [ ] `readDocument(id)`, `createDocument(doc)`, `replaceDocument(doc,
+- [x] Create `shared/server/check-store.ts`:
+  - [x] `CHECKS_PREFIX = "checks/"`
+  - [x] `getStore({ name: "fiftyfifty", consistency: "strong" })`
+  - [x] `readDocument(id)`, `createDocument(doc)`, `replaceDocument(doc,
         etag)`, `deleteDocument(id)`, `listDocuments()`
-  - [ ] `toExpiredTombstone(doc)` and `toRevokedTombstone(doc)` helpers
-  - [ ] No PII in helper logs
-- [ ] Create `shared/server/validate.ts`:
-  - [ ] `parseSharedCheck(value)` shape/limit validation
-  - [ ] Reject `share`, `editToken`, `totals`, and unknown metadata fields
-  - [ ] Strip optional handles when `includePayment === false`
-- [ ] Create `shared/server/tokens.ts`:
-  - [ ] `newShareId()` → 12 random bytes as 16-char base64url
-  - [ ] `newEditToken()` → 32 random bytes as base64url
-  - [ ] `hashEditToken(token)` → SHA-256
-  - [ ] `verifyEditToken(token, hash)` using `timingSafeEqual`
-- [ ] Create `shared/server/expiry.ts`:
-  - [ ] `SHARE_TTL_MS = 7 * 24 * 60 * 60 * 1000`
-  - [ ] `TOMBSTONE_TTL_MS = 30 * 24 * 60 * 60 * 1000`
-  - [ ] `isExpired(doc, now)`
-  - [ ] `nextExpiry(now)` (sliding from last edit)
-- [ ] Create `server/api/checks/index.post.ts`:
-  - [ ] Validate body; compute totals server-side
-  - [ ] Generate ID + edit token; hash the token
-  - [ ] `onlyIfNew` create; retry ID on collision
-  - [ ] Return `{ shareId, editToken, expiresAt, version }`
-- [ ] Create `server/api/checks/[id].get.ts`:
-  - [ ] Strong-consistency read
-  - [ ] `404` missing, `410` tombstone
-  - [ ] Expired active → tombstone + `410`
-  - [ ] `200` returns check + totals + `version`/`updatedAt`/`expiresAt`
-  - [ ] Never returns `editTokenHash`
-- [ ] Create `server/api/checks/[id].patch.ts`:
-  - [ ] Read doc + etag
-  - [ ] Verify edit token; `403` on failure
-  - [ ] `410` if expired/tombstone
-  - [ ] Version check; `409` on mismatch
-  - [ ] Validate body; recompute totals; strip handles if requested
-  - [ ] Increment version; set `updatedAt`; slide `expiresAt`
-  - [ ] `onlyIfMatch` write; `200` metadata
-- [ ] Create `server/api/checks/[id].delete.ts`:
-  - [ ] Verify edit token
-  - [ ] Replace with `revoked` tombstone (no check/PII/hash)
-  - [ ] `204`; idempotent for already-revoked
-- [ ] Add `server/api/README` or comments documenting status codes and auth.
+  - [x] `toExpiredTombstone(doc)` and `toRevokedTombstone(doc)` helpers
+  - [x] No PII in helper logs
+- [x] Create `shared/server/validate.ts`:
+  - [x] `parseSharedCheck(value)` shape/limit validation
+  - [x] Reject `share`, `editToken`, `totals`, and unknown metadata fields
+  - [x] Strip optional handles when `includePayment === false`
+- [x] Create `shared/server/tokens.ts`:
+  - [x] `newShareId()` → 12 random bytes as 16-char base64url
+  - [x] `newEditToken()` → 32 random bytes as base64url
+  - [x] `hashEditToken(token)` → SHA-256
+  - [x] `verifyEditToken(token, hash)` using `timingSafeEqual`
+- [x] Create `shared/server/expiry.ts`:
+  - [x] `SHARE_TTL_MS = 7 * 24 * 60 * 60 * 1000`
+  - [x] `TOMBSTONE_TTL_MS = 30 * 24 * 60 * 60 * 1000`
+  - [x] `isExpired(doc, now)`
+  - [x] `nextExpiry(now)` (sliding from last edit)
+- [x] Create `server/api/checks/index.post.ts`:
+  - [x] Validate body; compute totals server-side
+  - [x] Generate ID + edit token; hash the token
+  - [x] `onlyIfNew` create; retry ID on collision
+  - [x] Return `{ shareId, editToken, expiresAt, version }`
+- [x] Create `server/api/checks/[id].get.ts`:
+  - [x] Strong-consistency read
+  - [x] `404` missing, `410` tombstone
+  - [x] Expired active → tombstone + `410`
+  - [x] `200` returns check + totals + `version`/`updatedAt`/`expiresAt`
+  - [x] Never returns `editTokenHash`
+- [x] Create `server/api/checks/[id].patch.ts`:
+  - [x] Read doc + etag
+  - [x] Verify edit token; `403` on failure
+  - [x] `410` if expired/tombstone
+  - [x] Version check; `409` on mismatch
+  - [x] Validate body; recompute totals; strip handles if requested
+  - [x] Increment version; set `updatedAt`; slide `expiresAt`
+  - [x] `onlyIfMatch` write; `200` metadata
+- [x] Create `server/api/checks/[id].delete.ts`:
+  - [x] Verify edit token
+  - [x] Replace with `revoked` tombstone (no check/PII/hash)
+  - [x] `204`; idempotent for already-revoked
+- [x] Add `server/api/README` or comments documenting status codes and auth.
 
 ## Phase 3 — Cleanup
 
-- [ ] Create `netlify/functions/cleanup-expired.mts`:
-  - [ ] `export const config = { schedule: "0 3 * * *" }`
-  - [ ] List `checks/` with pagination
-  - [ ] Convert expired active docs to tombstones
-  - [ ] Delete tombstones older than `TOMBSTONE_TTL_MS`
-  - [ ] Log counts only, never IDs/content
-  - [ ] Keep each run under the 30-second scheduled limit (batch if needed)
-- [ ] Add an integration test using a fake store for the cleanup pass.
-- [ ] Add a manual test command/document for invoking cleanup locally.
+- [x] Create `netlify/functions/cleanup-expired.mts`:
+  - [x] `export const config = { schedule: "0 3 * * *" }`
+  - [x] List `checks/` with pagination
+  - [x] Convert expired active docs to tombstones
+  - [x] Delete tombstones older than `TOMBSTONE_TTL_MS`
+  - [x] Log counts only, never IDs/content
+  - [x] Keep each run under the 30-second scheduled limit (batch if needed)
+- [x] Add an integration test using a fake store for the cleanup pass.
+- [x] Add a manual test command/document for invoking cleanup locally.
 
 ## Phase 4 — Owner sharing client
 
@@ -334,3 +334,39 @@ risk because Netlify is the only builder.
   `.output/public`; Nitro's netlify preset emits client assets to `dist/`.
 - Merged `feature/shared-checks` into `main` as `2320e74`; PR #1 is closed.
 - Not yet verified: `netlify dev` Blobs context and live Blobs read/write.
+
+### 2026-11-18 — Phase 2 (server storage and API)
+
+- Added `shared/server/expiry.ts`, `tokens.ts`, `validate.ts`, and
+  `check-store.ts`. The store uses a small `BlobStore` interface so tests can
+  inject an in-memory implementation; `defaultCheckStore()` lazily imports
+  `@netlify/blobs` with strong consistency.
+- Added `POST /api/checks`, `GET/PATCH/DELETE /api/checks/:id`, plus
+  `server/utils/api.ts` for the uniform error shape and JSON body parsing.
+  `server/api/README.md` documents auth and status codes.
+- Create retries ID collisions with `onlyIfNew`; patch/delete use
+  `onlyIfMatch` and return `409` on a stale write. Expired reads and deletes
+  replace the document with a PII-free tombstone; tombstones return `410`
+  (delete is idempotent and returns `204`).
+- Added `test/check-store.test.ts` (tokens, expiry, validation, in-memory
+  create/read/replace/delete/list, tombstone contents). `bun test` passes:
+  18 tests across 2 files.
+- Still unverified: real Blobs reads/writes under `netlify dev` or a deploy.
+  Route handlers are not yet covered by an h3-level test (Phase 8).
+
+### 2026-11-18 — Phase 3 (cleanup)
+
+- Added `shared/server/cleanup.ts`: one idempotent pass that expires active
+  documents, deletes tombstones older than 30 days, and stops after a 20-second
+  time budget. Conditional writes use the ETag read with each document.
+- Added `netlify/functions/cleanup-expired.mts` with
+  `schedule: "0 3 * * *"`. It logs counts only
+  (`scanned`, `expired`, `deleted`, `deadline_reached`).
+- Added `test/helpers/memory-store.ts` (paginated in-memory Blobs store) and
+  `test/cleanup.test.ts`: mixed active/expired/tombstone docs across pages,
+  idempotent second pass, and the time-budget stop.
+- Documented local `netlify functions:invoke cleanup-expired` and the
+  production **Run now** path in `netlify/functions/README.md`.
+- `bun test` passes: 21 tests across 3 files.
+- Still unverified: the deployed function appearing in the Netlify functions
+  list and a real run against Blobs.
