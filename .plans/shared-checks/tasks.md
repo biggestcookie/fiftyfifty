@@ -223,24 +223,24 @@ risk because Netlify is the only builder.
 
 ## Phase 6 — Recipient view
 
-- [ ] Extract the presentation from `app/pages/checks/[id].vue` into
+- [x] Extract the presentation from `app/pages/checks/[id].vue` into
       `app/components/CheckView.vue`:
-  - [ ] total card
-  - [ ] receipt dropdown
-  - [ ] guest breakdowns
-  - [ ] payment buttons/modal
-  - [ ] `readonly`/action slots so the owner page can keep Edit/Share/QR
-- [ ] Create `app/pages/s/[id].vue`:
-  - [ ] Fetch `GET /api/checks/:id`
-  - [ ] Render `CheckView` read-only
-  - [ ] No `checkStore.add`, no IndexedDB write, no local persistence
-  - [ ] `410` → expired message
-  - [ ] `404` → not-found message
-  - [ ] network failure → offline error with retry
-  - [ ] loading skeleton
-- [ ] Keep legacy `app/pages/share/[payload].vue` behavior unchanged.
-- [ ] Ensure recipients never see Edit/Share/QR controls.
-- [ ] Ensure payment buttons still work for recipients.
+  - [x] total card
+  - [x] receipt dropdown
+  - [x] guest breakdowns
+  - [x] payment buttons/modal
+  - [x] `readonly`/action slots so the owner page can keep Edit/Share/QR
+- [x] Create `app/pages/s/[id].vue`:
+  - [x] Fetch `GET /api/checks/:id`
+  - [x] Render `CheckView` read-only
+  - [x] No `checkStore.add`, no IndexedDB write, no local persistence
+  - [x] `410` → expired message
+  - [x] `404` → not-found message
+  - [x] network failure → offline error with retry
+  - [x] loading skeleton
+- [x] Keep legacy `app/pages/share/[payload].vue` behavior unchanged.
+- [x] Ensure recipients never see Edit/Share/QR controls.
+- [x] Ensure payment buttons still work for recipients.
 
 ## Phase 7 — Server OCR with on-device fallback
 
@@ -434,3 +434,21 @@ risk because Netlify is the only builder.
   no prompt.
 - Typecheck, `bun test` (21), and build pass. Test links were revoked and local
   test checks removed.
+
+### 2026-11-18 — Phase 6 (recipient view)
+
+- Extracted totals, receipt dropdown, guest breakdowns, and the payment
+  buttons/modal from the owner page into `app/components/CheckView.vue`.
+  Owner-only actions live in the `actions` slot; the return-home link is in the
+  `footer` slot, so the recipient page simply omits both.
+- Added `app/pages/s/[id].vue`: fetches `GET /api/checks/:id`, renders
+  `CheckView`, writes nothing to IndexedDB, and has loading skeleton,
+  expired/revoked `410`, not-found `404`, and offline-with-retry states.
+- Added `createdAt` to the shared-check GET response (falls back to
+  `updatedAt` while an older server deploy is live).
+- Verified through the live API in the browser: totals ($26), guest breakdowns,
+  receipt dropdown, and payment modal (guest selection updates the amount) all
+  work; no Edit/Share/QR controls; unknown IDs show the not-found state and
+  revoked links show the revoked state. The owner page still renders and
+  shares correctly after the extraction.
+- Typecheck, targeted ESLint, `bun test` (21), and build pass.

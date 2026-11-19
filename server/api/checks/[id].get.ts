@@ -63,6 +63,7 @@ export default defineEventHandler(async (event) => {
   return {
     shareId: doc.shareId,
     version: doc.version,
+    createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
     expiresAt: doc.expiresAt,
     check: doc.check,
