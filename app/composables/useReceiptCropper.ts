@@ -26,6 +26,38 @@ import type { CropBoxBounds } from "~/stores/receiptScan";
  */
 const MAX_CROP_EDGE = 1600;
 
+/**
+ * Cropper's built-in corner handles are 15×15px hit boxes, and the full-length
+ * edge handles overlap their corners. That makes it easy to grab the edge (or
+ * the move handle) when aiming for a corner, especially on touch. Inline
+ * styles on the handle hosts win over the shadow root's `:host` rules, so the
+ * four corner targets can be enlarged without patching Cropper. The boxes
+ * stay centred on the corner so the visible dots don't move.
+ */
+const CORNER_HANDLE_HIT_SIZE = 44;
+
+function enlargeCornerHandles(selection: CropperSelectionElement): void {
+  const offset = CORNER_HANDLE_HIT_SIZE / 2;
+  const corners = {
+    "ne-resize": { top: offset, right: offset },
+    "nw-resize": { top: offset, left: offset },
+    "se-resize": { bottom: offset, right: offset },
+    "sw-resize": { bottom: offset, left: offset },
+  } as const;
+  for (const [action, inset] of Object.entries(corners)) {
+    const handle = selection.querySelector<HTMLElement>(
+      `cropper-handle[action="${action}"]`
+    );
+    if (!handle) continue;
+    handle.style.width = `${CORNER_HANDLE_HIT_SIZE}px`;
+    handle.style.height = `${CORNER_HANDLE_HIT_SIZE}px`;
+    if ("top" in inset) handle.style.top = `-${inset.top}px`;
+    if ("bottom" in inset) handle.style.bottom = `-${inset.bottom}px`;
+    if ("left" in inset) handle.style.left = `-${inset.left}px`;
+    if ("right" in inset) handle.style.right = `-${inset.right}px`;
+  }
+}
+
 type SelectionGeometry = {
   x: number;
   y: number;
@@ -50,7 +82,10 @@ export function useReceiptCropper(source: Ref<Blob | null>) {
   // Cropper.js gates $center/$rotate/$scale behind the rotatable/scalable/
   // translatable flags (all off by default, so user gestures cannot
   // transform the image). Flip them on only for programmatic calls.
-  function withTransformFlags(image: CropperImageElement, fn: () => void): void {
+  function withTransformFlags(
+    image: CropperImageElement,
+    fn: () => void
+  ): void {
     const { rotatable, scalable, translatable } = image;
     image.rotatable = true;
     image.scalable = true;
@@ -106,8 +141,10 @@ export function useReceiptCropper(source: Ref<Blob | null>) {
     const canvas = cropperRef.value?.getCropperCanvas();
     if (!canvas) return rect;
     const rendered = canvas.getBoundingClientRect();
-    const scaleX = canvas.clientWidth > 0 ? rendered.width / canvas.clientWidth : 1;
-    const scaleY = canvas.clientHeight > 0 ? rendered.height / canvas.clientHeight : 1;
+    const scaleX =
+      canvas.clientWidth > 0 ? rendered.width / canvas.clientWidth : 1;
+    const scaleY =
+      canvas.clientHeight > 0 ? rendered.height / canvas.clientHeight : 1;
     return {
       x: scaleX ? rect.x / scaleX : rect.x,
       y: scaleY ? rect.y / scaleY : rect.y,
@@ -136,14 +173,23 @@ export function useReceiptCropper(source: Ref<Blob | null>) {
     geometry: SelectionGeometry,
     max: SelectionGeometry
   ): SelectionGeometry {
-    let { x, y, width, height } = geometry;
-    if (width > max.width) width = max.width;
-    if (height > max.height) height = max.height;
-    if (x < max.x) x = max.x;
-    if (y < max.y) y = max.y;
-    if (x + width > max.x + max.width) x = max.x + max.width - width;
-    if (y + height > max.y + max.height) y = max.y + max.height - height;
-    return { x, y, width, height };
+    const { x, y, width, height } = geometry;
+    const maxRight = max.x + max.width;
+    const maxBottom = max.y + max.height;
+    // Clamp each edge independently so the edge the user is NOT dragging
+    // stays anchored. The old version moved x/y when the right/bottom edge
+    // crossed the image bounds, which slid the whole box and made a corner
+    // drag look like it was grabbing the opposite corner.
+    const left = Math.max(x, max.x);
+    const top = Math.max(y, max.y);
+    const right = Math.min(x + width, maxRight);
+    const bottom = Math.min(y + height, maxBottom);
+    return {
+      x: left,
+      y: top,
+      width: Math.max(0, right - left),
+      height: Math.max(0, bottom - top),
+    };
   }
 
   function clampSelection() {
@@ -172,7 +218,9 @@ export function useReceiptCropper(source: Ref<Blob | null>) {
     if (cropperRef.value) return; // already initialized
     const mod = await import("cropperjs");
     const CropperClass = mod.default;
-    cropperRef.value = new CropperClass(containerRef.value) as unknown as Cropper;
+    cropperRef.value = new CropperClass(
+      containerRef.value
+    ) as unknown as Cropper;
     const canvas = cropperRef.value.getCropperCanvas();
     const selection = cropperRef.value.getCropperSelection();
     const image = cropperRef.value.getCropperImage();
@@ -193,8 +241,9 @@ export function useReceiptCropper(source: Ref<Blob | null>) {
       // image selected (100% of the canvas clamps to exactly the visible
       // photo) so the default scan is never trimmed.
       selection.initialCoverage = 1;
+      enlargeCornerHandles(selection);
       selection.addEventListener("change", (event: Event) => {
-        const detail = (event as CustomEvent<SelectionGeometry>).detail;
+        const { detail } = event as CustomEvent<SelectionGeometry>;
         if (!detail) return;
         const max = imageRect.value;
         if (max.width <= 0 || max.height <= 0) return;
@@ -209,7 +258,12 @@ export function useReceiptCropper(source: Ref<Blob | null>) {
           // geometry through $change so the box is re-rendered ($change
           // aborts without rendering when its change event is prevented).
           event.preventDefault();
-          selection.$change(clamped.x, clamped.y, clamped.width, clamped.height);
+          selection.$change(
+            clamped.x,
+            clamped.y,
+            clamped.width,
+            clamped.height
+          );
         }
         isValid.value = clamped.width > 0 && clamped.height > 0;
       });
@@ -222,7 +276,7 @@ export function useReceiptCropper(source: Ref<Blob | null>) {
       // The detail is used instead of measuring the DOM because the event
       // fires before the new transform is rendered.
       image.addEventListener("change", (event: Event) => {
-        const detail = (event as CustomEvent<SelectionGeometry>).detail;
+        const { detail } = event as CustomEvent<SelectionGeometry>;
         if (detail) setImageRect(toLayoutSpace(detail));
         clampSelection();
       });
@@ -266,7 +320,8 @@ export function useReceiptCropper(source: Ref<Blob | null>) {
 
   async function getCroppedBlob(): Promise<Blob | null> {
     const c = cropperRef.value;
-    const selection: CropperSelectionElement | null | undefined = c?.getCropperSelection();
+    const selection: CropperSelectionElement | null | undefined =
+      c?.getCropperSelection();
     const image = c?.getCropperImage();
     if (!selection || !image || selection.width <= 0 || selection.height <= 0) {
       return null;
@@ -278,7 +333,9 @@ export function useReceiptCropper(source: Ref<Blob | null>) {
     const scale = Math.hypot(a, b);
     if (!Number.isFinite(scale) || scale <= 0) return null;
     let outputWidth = Math.round(selection.width / scale);
-    const outputHeight = Math.round(outputWidth * (selection.height / selection.width));
+    const outputHeight = Math.round(
+      outputWidth * (selection.height / selection.width)
+    );
     const longest = Math.max(outputWidth, outputHeight);
     if (longest > MAX_CROP_EDGE) {
       outputWidth = Math.round(outputWidth * (MAX_CROP_EDGE / longest));

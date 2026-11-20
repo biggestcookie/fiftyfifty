@@ -15,7 +15,7 @@ No marketing fluff. Nothing to sell.
 - Recipients read the live server copy. They keep only a small, non-PII
   preview in Recent checks, never a full local check.
 - Receipt scanning is server-first through Google Gemini, with on-device
-  PaddleOCR as a fallback and an explicit “Scan on this device” option.
+  PaddleOCR as a fallback and an explicit “Scan without uploading” option.
 - Sharing and server scanning always require an explicit user action.
 
 ## Privacy and retention

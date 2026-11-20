@@ -97,7 +97,7 @@ function onContinue() {
 const photoInput = ref<HTMLInputElement | null>(null);
 const libraryInput = ref<HTMLInputElement | null>(null);
 const scanPreviewUrl = ref<string | null>(null);
-/** When true, skip the server and scan on this device. */
+/** When true, skip the server and scan without uploading. */
 const onDeviceOnly = ref(false);
 
 /**
@@ -159,12 +159,6 @@ const {
   deviceSupported,
 } = scanner;
 
-const scanPrivacyLine = computed(() =>
-  onDeviceOnly.value
-    ? "Scanned on this device — the photo never leaves your phone."
-    : "Receipt photos are sent to our server and Google Gemini for scanning. Images are not stored."
-);
-
 const scanStatusLabel = computed(() => {
   if (scanStatus.value === "preparing") return "Preparing scanner…";
   if (scanStatus.value === "uploading")
@@ -195,8 +189,8 @@ const scanMenuItems = computed(() => [
   {
     label:
       deviceSupported.value === false
-        ? "Scan on this device (unsupported)"
-        : "Scan on this device",
+        ? "Scan without uploading (unsupported)"
+        : "Scan without uploading",
     icon: "i-lucide-smartphone",
     type: "checkbox" as const,
     checked: onDeviceOnly.value,
@@ -260,7 +254,8 @@ async function onFileSelected(event: Event) {
 
   // The two file inputs are wired identically; which one fired tells us the
   // source, which the store uses later to decide Retake visibility.
-  const origin: SourceOrigin = input === photoInput.value ? "camera" : "library";
+  const origin: SourceOrigin =
+    input === photoInput.value ? "camera" : "library";
 
   const items = draft.draft?.items ?? [];
   const fees = draft.draft?.fees ?? [];
@@ -269,8 +264,7 @@ async function onFileSelected(event: Event) {
   // labels alone are not a reliable signal — a non-zero amount is what
   // means the user committed to something we'd be discarding on rescan.
   const hasUserContent =
-    items.some((i) => i.amount > 0) ||
-    fees.some((f) => f.amount > 0);
+    items.some((i) => i.amount > 0) || fees.some((f) => f.amount > 0);
   if (hasUserContent) {
     const ok = window.confirm(
       "Scanning will replace your current items and fees. Continue?"
@@ -325,7 +319,7 @@ async function runCroppedScan(blob: Blob, mode: "auto" | "device") {
   }
 }
 
-function acknowledgeServerScan() {
+function acknowledgePrivacyNotice() {
   privacyAck.value = true;
   try {
     localStorage.setItem(PRIVACY_ACK_KEY, "1");
@@ -353,7 +347,7 @@ async function onCroppedForScan(blob: Blob) {
 }
 
 function continueWithServer() {
-  acknowledgeServerScan();
+  acknowledgePrivacyNotice();
   privacyNoticeOpen.value = false;
   const blob = pendingScanBlob.value;
   pendingScanBlob.value = null;
@@ -361,6 +355,9 @@ function continueWithServer() {
 }
 
 function scanPendingOnDevice() {
+  // Choosing either path means the user has seen and acted on the notice, so
+  // it never comes back.
+  acknowledgePrivacyNotice();
   privacyNoticeOpen.value = false;
   const blob = pendingScanBlob.value;
   pendingScanBlob.value = null;
@@ -464,16 +461,8 @@ onBeforeUnmount(() => {
             class="min-h-[44px] justify-between"
             trailing-icon="i-lucide-chevron-down"
             aria-label="Scan receipt"
-          >
-            <span class="flex flex-col items-start">
-              <span>Scan receipt</span>
-              <span
-                class="text-xs font-normal text-neutral-500 dark:text-neutral-400"
-              >
-                {{ scanPrivacyLine }}
-              </span>
-            </span>
-          </UButton>
+            label="Scan receipt"
+          />
         </UDropdownMenu>
 
         <div
@@ -797,7 +786,7 @@ onBeforeUnmount(() => {
             scanning. Images are not stored.
           </p>
           <p class="text-sm text-neutral-500">
-            You can scan on this device instead — the photo never leaves your
+            You can scan without uploading instead — the photo never leaves your
             phone.
           </p>
           <div class="mt-2 flex flex-col gap-2">
@@ -808,7 +797,7 @@ onBeforeUnmount(() => {
               @click="continueWithServer"
             />
             <UButton
-              label="Scan on this device"
+              label="Scan without uploading"
               color="neutral"
               variant="soft"
               size="lg"
