@@ -6,12 +6,18 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: "ready"): void;
-  (e: "change"): void;
+  (e: "ready" | "change"): void;
 }>();
 
-const { containerRef, objectUrl, init, rotate, setPerspective, getCroppedBlob, getBounds } =
-  useReceiptCropper(toRef(props, "source"));
+const {
+  containerRef,
+  objectUrl,
+  init,
+  rotate,
+  setPerspective,
+  getCroppedBlob,
+  getBounds,
+} = useReceiptCropper(toRef(props, "source"));
 
 onMounted(async () => {
   await init();
@@ -34,7 +40,7 @@ defineExpose({ getCroppedBlob, getBounds, rotate, setPerspective });
       ref="containerRef"
       :src="objectUrl"
       alt="Receipt to crop"
-      style="display: none;"
+      style="display: none"
       @load="emit('change')"
     />
   </div>

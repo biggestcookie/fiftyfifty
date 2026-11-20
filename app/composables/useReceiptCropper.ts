@@ -406,7 +406,7 @@ export function useReceiptCropper(source: Ref<Blob | null>) {
   const resizeObserver: ResizeObserver | null =
     typeof ResizeObserver !== "undefined"
       ? new ResizeObserver((entries) => {
-          const entry = entries[0];
+          const [entry] = entries;
           if (!entry) return;
           const { width, height } = entry.contentRect;
           if (width > 0 && height > 0) {

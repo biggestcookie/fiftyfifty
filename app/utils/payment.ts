@@ -87,9 +87,9 @@ export function venmoAppUrl(
   amount: number,
   note: string
 ): string {
-  const cleanHandle = encodeURIComponent(handle.replace(/^@/, "").trim());
   const params = new URLSearchParams({
     txn: "pay",
+    recipients: handle.replace(/^@/, "").trim(),
     amount: amount.toFixed(2),
     note,
   });
