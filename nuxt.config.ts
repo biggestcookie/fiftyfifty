@@ -43,6 +43,13 @@ export default defineNuxtConfig({
   },
   nitro: {
     preset: "netlify",
+    // Emit a static SPA shell as a fallback. The Nitro function normally
+    // renders the shell, but a static index/200.html keeps the app usable if
+    // function routing or the production alias is misconfigured.
+    prerender: {
+      routes: ["/", "/200.html", "/404.html"],
+      crawlLinks: false,
+    },
     // Dev-server only: send `/api/*` to the deployed site so local client work
     // uses the live Netlify Functions and Blobs. Production builds ignore
     // `devProxy`; deploys still run the real server routes.
