@@ -19,6 +19,30 @@
 [functions]
   directory = "netlify/functions"
 
+# Code-based rate limiting. Netlify supports this for redirects on every plan
+# (2 rules max on Free), but not for Nitro-generated functions in netlify.toml.
+# The OCR rule is listed first so it always wins for that path; the broad rule
+# covers every other API route. Both count per IP + domain and block with 429.
+[[redirects]]
+  from = "/api/ocr"
+  to = "/api/ocr"
+  status = 200
+  force = true
+  [redirects.rate_limit]
+    window_limit = 5
+    window_size = 60
+    aggregate_by = ["ip", "domain"]
+
+[[redirects]]
+  from = "/api/*"
+  to = "/api/:splat"
+  status = 200
+  force = true
+  [redirects.rate_limit]
+    window_limit = 120
+    window_size = 60
+    aggregate_by = ["ip", "domain"]
+
 # `netlify dev` is the local path for API/Blobs work; `nuxt dev` has no Netlify
 # runtime context.
 [dev]

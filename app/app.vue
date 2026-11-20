@@ -12,7 +12,7 @@ useHead({
 
 const title = "FiftyFifty";
 const description =
-  "Quickly split bills with friends. No accounts, no servers, fully private.";
+  "Quickly split bills with friends. No accounts, no tracking, and shared links expire.";
 
 useSeoMeta({
   title,

@@ -13,6 +13,8 @@ import {
 
 const MODEL = "gemini-3.5-flash-lite";
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+/** Image plus multipart boundaries/headers. */
+const MAX_REQUEST_BYTES = MAX_IMAGE_BYTES + 64 * 1024;
 const TIMEOUT_MS = 25_000;
 const MAX_ITEMS = 80;
 const MAX_FEES = 12;
@@ -81,6 +83,16 @@ function providerStatus(error: unknown): number | undefined {
 
 export default defineEventHandler(async (event) => {
   setResponseHeader(event, "cache-control", "no-store");
+
+  const declaredLength = Number(getHeader(event, "content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_REQUEST_BYTES) {
+    return apiError(
+      event,
+      413,
+      "image_too_large",
+      "The receipt image must be 4 MB or smaller."
+    );
+  }
 
   const parts = await readMultipartFormData(event).catch(() => undefined);
   if (!parts) {

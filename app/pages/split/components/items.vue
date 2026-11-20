@@ -13,6 +13,11 @@ onMounted(() => {
   // Probe camera permission so the "Camera access blocked" banner can
   // surface immediately on mount if the user previously denied it.
   void refreshCameraPermission();
+  try {
+    privacyAck.value = localStorage.getItem(PRIVACY_ACK_KEY) === "1";
+  } catch {
+    // Storage can be unavailable in private modes; prompt again.
+  }
 });
 
 const items = computed(() => draft.draft?.items ?? []);
@@ -94,6 +99,16 @@ const libraryInput = ref<HTMLInputElement | null>(null);
 const scanPreviewUrl = ref<string | null>(null);
 /** When true, skip the server and scan on this device. */
 const onDeviceOnly = ref(false);
+
+/**
+ * One-time server-scan disclosure. `privacyAck` is loaded from localStorage on
+ * mount; the cropped blob waits in `pendingScanBlob` until the user chooses
+ * server, device, or cancel.
+ */
+const PRIVACY_ACK_KEY = "fiftyfifty.ocr-server-notice";
+const privacyAck = ref(false);
+const privacyNoticeOpen = ref(false);
+const pendingScanBlob = ref<Blob | null>(null);
 /**
  * True when the camera permission is denied at the OS level. Triggers the
  * "Camera access blocked" banner so the user knows why the camera path is
@@ -277,21 +292,15 @@ async function onFileSelected(event: Event) {
 }
 
 /**
- * Runs the existing scan pipeline with the cropped blob from the crop modal.
- * Everything downstream of the file pick is unchanged from the pre-cropper
- * flow — the crop only replaces the raw capture at the OCR boundary.
+ * Runs the scan pipeline with the cropped blob from the crop modal.
+ * `mode` is chosen by the one-time privacy notice or the on-device toggle.
  */
-async function onCroppedForScan(blob: Blob) {
-  if (scanPreviewUrl.value) URL.revokeObjectURL(scanPreviewUrl.value);
-  scanPreviewUrl.value = URL.createObjectURL(blob);
-  scanNotice.value = null;
+async function runCroppedScan(blob: Blob, mode: "auto" | "device") {
   try {
     // Server-first unless the user explicitly chose on-device scanning. The
     // cropper has already produced the final crop; only the upload copy is
     // resized/re-encoded inside useReceiptScan.
-    const parsed = await scanner.scan(blob, {
-      mode: onDeviceOnly.value ? "device" : "auto",
-    });
+    const parsed = await scanner.scan(blob, { mode });
     draft.replaceFromScan({
       items: parsed.items,
       fees: parsed.fees,
@@ -301,7 +310,10 @@ async function onCroppedForScan(blob: Blob) {
         ? { kind: "low-confidence", confidence: "low" }
         : { kind: "success", confidence: "high" };
   } catch (e) {
-    console.error("receipt scan failed", e);
+    console.error(
+      "receipt scan failed:",
+      e instanceof Error ? e.message : "unknown error"
+    );
     // Every recoverable error offers "try again" + "enter manually". The
     // composable supplies specific copy for 4xx/unsupported failures.
     scanNotice.value = {
@@ -313,8 +325,51 @@ async function onCroppedForScan(blob: Blob) {
   }
 }
 
-function undoScan() {
-  draft.undoScan();
+function acknowledgeServerScan() {
+  privacyAck.value = true;
+  try {
+    localStorage.setItem(PRIVACY_ACK_KEY, "1");
+  } catch {
+    // Best effort; the notice reappears next visit.
+  }
+}
+
+async function onCroppedForScan(blob: Blob) {
+  if (scanPreviewUrl.value) URL.revokeObjectURL(scanPreviewUrl.value);
+  scanPreviewUrl.value = URL.createObjectURL(blob);
+  scanNotice.value = null;
+
+  const willUseServer =
+    !onDeviceOnly.value &&
+    (typeof navigator === "undefined" || navigator.onLine !== false);
+
+  if (willUseServer && !privacyAck.value) {
+    pendingScanBlob.value = blob;
+    privacyNoticeOpen.value = true;
+    return;
+  }
+
+  await runCroppedScan(blob, onDeviceOnly.value ? "device" : "auto");
+}
+
+function continueWithServer() {
+  acknowledgeServerScan();
+  privacyNoticeOpen.value = false;
+  const blob = pendingScanBlob.value;
+  pendingScanBlob.value = null;
+  if (blob) void runCroppedScan(blob, "auto");
+}
+
+function scanPendingOnDevice() {
+  privacyNoticeOpen.value = false;
+  const blob = pendingScanBlob.value;
+  pendingScanBlob.value = null;
+  if (blob) void runCroppedScan(blob, "device");
+}
+
+function cancelPendingScan() {
+  privacyNoticeOpen.value = false;
+  pendingScanBlob.value = null;
   if (scanPreviewUrl.value) {
     URL.revokeObjectURL(scanPreviewUrl.value);
     scanPreviewUrl.value = null;
@@ -323,8 +378,21 @@ function undoScan() {
   scanNotice.value = null;
 }
 
+function undoScan() {
+  draft.undoScan();
+  if (scanPreviewUrl.value) {
+    URL.revokeObjectURL(scanPreviewUrl.value);
+    scanPreviewUrl.value = null;
+  }
+  pendingScanBlob.value = null;
+  privacyNoticeOpen.value = false;
+  scanner.reset();
+  scanNotice.value = null;
+}
+
 onBeforeUnmount(() => {
   if (scanPreviewUrl.value) URL.revokeObjectURL(scanPreviewUrl.value);
+  pendingScanBlob.value = null;
 });
 </script>
 
@@ -712,5 +780,52 @@ onBeforeUnmount(() => {
     </div>
 
     <ReceiptCropperModal @scanned="onCroppedForScan" />
+
+    <UModal
+      v-model:open="privacyNoticeOpen"
+      :dismissible="false"
+      :close="false"
+      :ui="{ content: 'sm:max-w-md' }"
+    >
+      <template #content>
+        <div class="flex flex-col gap-4 p-6">
+          <h2 class="text-lg font-semibold">
+            Scan this receipt on our server?
+          </h2>
+          <p class="text-sm text-neutral-500">
+            Receipt photos are sent to our server and Google Gemini for
+            scanning. Images are not stored.
+          </p>
+          <p class="text-sm text-neutral-500">
+            You can scan on this device instead — the photo never leaves your
+            phone.
+          </p>
+          <div class="mt-2 flex flex-col gap-2">
+            <UButton
+              label="Continue with server"
+              size="lg"
+              block
+              @click="continueWithServer"
+            />
+            <UButton
+              label="Scan on this device"
+              color="neutral"
+              variant="soft"
+              size="lg"
+              block
+              @click="scanPendingOnDevice"
+            />
+            <UButton
+              label="Cancel"
+              color="neutral"
+              variant="ghost"
+              size="lg"
+              block
+              @click="cancelPendingScan"
+            />
+          </div>
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>

@@ -44,26 +44,63 @@ Bun (`enableCompileCache` returns null).
 
 ## Environment
 
-Netlify AI Gateway activates after the first production deploy. Locally, either
-use the Gateway-provided variables or set `GEMINI_API_KEY` yourself:
+Server OCR uses one of:
 
-- `GEMINI_API_KEY`
-- `GOOGLE_GEMINI_BASE_URL` (optional; set by the Gateway)
+- a user-provided `GEMINI_API_KEY` (calls Google directly), or
+- Netlify AI Gateway's injected `GEMINI_API_KEY` /
+  `GOOGLE_GEMINI_BASE_URL`.
+
+The AI Gateway activates after the first production deploy and requires a
+credit-based plan with AI features enabled. A project/team-level
+`GOOGLE_API_KEY` or `GOOGLE_VERTEX_BASE_URL` suppresses the Gateway's Gemini
+variables. Locally, `nuxt dev` proxies `/api/*` to production; use `netlify dev`
+for isolated server work.
 
 Never expose these variables to the client bundle. `NETLIFY_AUTH_TOKEN` and
 `NETLIFY_SITE_ID` are deploy/CI secrets only.
+
+## Request limits
+
+- `POST /api/checks` and `PATCH /api/checks/:id` reject JSON bodies over
+  **64 KB** with `413 body_too_large`.
+- `POST /api/ocr` rejects requests over ~4 MB plus multipart overhead with
+  `413 image_too_large`, and rejects a single image over 4 MB.
+- Both are application-level checks in addition to Netlify's platform limits.
+
+## Rate limits
+
+Code-based rate limiting lives in `netlify.toml` as rate-limited redirects.
+Netlify supports code rules for redirects (and standalone functions), but not
+for Nitro's generated function; the redirects rewrite to the same path so the
+Nitro route still handles the request.
+
+Current rules (per IP + domain, 60-second window, `429` when exceeded):
+
+| Path      | Limit   | Purpose                     |
+| --------- | ------- | --------------------------- |
+| `/api/*`  | 120/min | broad API protection        |
+| `/api/ocr` | 5/min  | strict image/Gemini spend guard |
+
+Free plans allow **2** code-based rules per project; Pro allows 5. If a tighter
+creation limit is needed on Pro, add `/api/checks` with a lower limit (e.g.
+10/min). The stricter OCR rule still applies to `/api/ocr` because every
+matching rule counts independently.
+
+Enterprise/HP Edge teams can add UI rules for IP ranges, headers, or
+geolocation; code rules take precedence when both exist.
+
+## AI spend cap
+
+The code cannot enforce model spend; set it at the provider/account level:
+
+- **Own `GEMINI_API_KEY`:** set a quota/budget and alerts in Google AI Studio
+  or Google Cloud for that key/project.
+- **Netlify AI Gateway:** use the team's AI credit usage limits and credit
+  balance/auto-recharge controls in Netlify billing. AI Gateway inference is
+  metered in credits.
 
 ## Share URLs
 
 Share URLs use the current page origin (`window.location.origin`), so no
 canonical-domain constant is needed. The SPA builds
 `${origin}/s/<shareId>` at share time.
-
-## Rate limits
-
-Rate limiting is configured in the Netlify dashboard (Firewall rules), not in
-this repo. Required rules:
-
-- `POST /api/checks` — creation limit.
-- `POST /api/ocr` — strict per-IP limit.
-- `GET /api/checks/*` — broad limit; count 404s to deter enumeration.

@@ -10,11 +10,11 @@ devScripts:
 linters:
   - "eslint"
   - "prettier"
-ci: "github-actions"
+ci: "netlify"
 detectionHints:
   - "nuxt.config"
   - "package.json:bun"
-  - "bun.lockb"
+  - "bun.lock"
 references:
   nuxt-ui: "https://ui.nuxt.com"
   nuxt-docs: "https://nuxt.com/docs"

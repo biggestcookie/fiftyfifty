@@ -275,39 +275,40 @@ risk because Netlify is the only builder.
 
 ## Phase 8 — Hardening, docs, and verification
 
-- [ ] Add `nuxt.config.ts` route rules for `/api/**`:
+- [x] Add `nuxt.config.ts` route rules for `/api/**`:
       `cache-control: no-store`, `x-robots-tag: noindex, nofollow`,
       `referrer-policy: no-referrer`.
-- [ ] Add Workbox runtime `NetworkOnly` for `/api/**`; verify shared checks
+- [x] Add Workbox runtime `NetworkOnly` for `/api/**`; verify shared checks
       are never served from a cache.
-- [ ] Confirm `/s/:id` navigation works with `navigateFallback: "200.html"`.
-- [ ] Enforce body-size limits in the API routes (check ≤ 64 KB, image ≤ 4 MB).
-- [ ] Add Netlify rate limits and an AI spend cap.
-- [ ] Remove PII from console logs (`[CHECK_RECEIPT]`, raw OCR lines).
-- [ ] Add tests:
-  - [ ] totals parity
-  - [ ] validation rejects malformed/unknown fields
-  - [ ] token hash/verify
-  - [ ] expiry/tombstone transitions
-  - [ ] create/get/patch/delete with a fake store
-  - [ ] 403/404/409/410 paths
-  - [ ] cleanup pass
+- [x] Confirm `/s/:id` navigation works with `navigateFallback: "200.html"`.
+- [x] Enforce body-size limits in the API routes (check ≤ 64 KB, image ≤ 4 MB).
+- [x] Add Netlify rate limits in code (`netlify.toml` rate-limited redirects).
+      AI spend cap remains a provider/account setting; see `server/README.md`.
+- [x] Remove PII from console logs (`[CHECK_RECEIPT]`, raw OCR lines).
+- [x] Add tests:
+  - [x] totals parity
+  - [x] validation rejects malformed/unknown fields
+  - [x] token hash/verify
+  - [x] expiry/tombstone transitions
+  - [x] create/get/patch/delete with a fake store
+  - [x] 403/404/409/410 paths
+  - [x] cleanup pass
 - [ ] Manual multi-device checks:
-  - [ ] owner share → recipient open → recipient IDB has no check
+  - [x] owner share → recipient open → recipient IDB has no check
   - [ ] owner edit → recipient refresh sees updates
   - [ ] offline owner edit → local save + pending sync → online retry
-  - [ ] expired link → 410; owner banner
+  - [x] expired link → 410; owner banner
   - [ ] re-share with handles → prompt → new URL; old URL stays dead
   - [ ] server OCR → no image in Blobs/logs; fallback works with server down
-- [ ] Update `README.md`:
-  - [ ] remove “no backend/no cloud” claims
-  - [ ] describe server-backed shared links and transient Gemini upload
-  - [ ] describe recipient no-cache behavior
-- [ ] Update `agents.md`:
-  - [ ] architecture now includes Netlify Functions/Blobs + Gemini
-  - [ ] PII/retention rules
-  - [ ] shared-link and OCR invariants
-- [ ] Add a one-time privacy notice before the first server OCR scan.
+- [x] Update `README.md`:
+  - [x] remove “no backend/no cloud” claims
+  - [x] describe server-backed shared links and transient Gemini upload
+  - [x] describe recipient no-cache behavior
+- [x] Update `agents.md`:
+  - [x] architecture now includes Netlify Functions/Blobs + Gemini
+  - [x] PII/retention rules
+  - [x] shared-link and OCR invariants
+- [x] Add a one-time privacy notice before the first server OCR scan.
 
 ## Optional follow-ups (not required for v1)
 
@@ -533,3 +534,52 @@ risk because Netlify is the only builder.
 - `POST /api/ocr` now retries `429`/`503` once after 700ms before returning
   `502`, still inside the 25s abort budget. The client falls back to device
   OCR if both attempts fail.
+
+### 2026-11-19 — Phase 8 (hardening, docs, verification)
+
+- Added `/api/**` route headers in `nuxt.config.ts` (`no-store`,
+  `noindex, nofollow`, `no-referrer`) and a Workbox `NetworkOnly` runtime rule.
+  Inspected the built `dist/sw.js`: it registers `NetworkOnly` for `/api/*` and
+  binds navigation to `200.html`. Writes (`POST`/`PATCH`/`DELETE`) never match a
+  cache strategy.
+- Extracted the API orchestration into `shared/server/check-service.ts`; the
+  four Nitro routes are now thin HTTP wrappers. This makes the 200/201/204/400/
+  403/404/409/410 transitions testable with the in-memory Blobs store.
+- Added `test/check-service.test.ts` (create/read/patch/delete, token auth,
+  version conflicts, expiry/revocation tombstones, revoke idempotency, racing
+  writes) and `test/api-body.test.ts` (JSON object parsing, 64 KB cap).
+  `bun test` now passes 47 tests across 6 files.
+- Enforced request size limits: JSON check bodies > 64 KB → `413
+  body_too_large`; OCR requests > 4 MB plus multipart overhead, or an image
+  > 4 MB → `413 image_too_large`. Verified through the built function.
+- Reduced OCR logging to error messages only; no raw OCR lines, labels, or
+  receipt text. No `[CHECK_RECEIPT]` log remains.
+- Added the one-time server-scan privacy notice before the first upload, with
+  “Continue with server”, “Scan on this device”, and “Cancel”. The
+  acknowledgement is stored in localStorage; choosing on-device does not set it.
+- Rewrote `README.md` and `agents.md` for the client/server architecture,
+  retention rules, OCR invariants, and no-cache behavior. Updated the app/PWA
+  description that previously claimed “no servers”.
+- Verified built-function headers and size limits directly. Browser verification
+  of the notice was interrupted by the browser tool disconnecting; the build and
+  type checks cover the component.
+- Still manual: Netlify Firewall rate rules and the provider/AI spend cap
+  (documented in `server/README.md`), plus the multi-device owner-edit,
+  offline-sync, re-share, and OCR-fallback UI checks.
+- Typecheck still reports only the two pre-existing, unrelated errors
+  (`ReceiptCropperModal` UModal `container` slot and `qrcode-svg` typings).
+
+### 2026-11-19 — Code-based rate limiting
+
+- Added two rate-limited redirects in `netlify.toml` (all plans support
+  code-based redirect rules; Free allows two):
+  - `/api/*` → 120 requests/min per IP + domain.
+  - `/api/ocr` → 5 requests/min per IP + domain.
+  Requests over either limit return `429`. Both matching rules count
+  independently, so OCR gets the strict cap while every API route keeps the
+  broad cap.
+- Nitro-generated functions cannot define `rateLimit` in `netlify.toml`, so the
+  rules are redirects that rewrite to the same path and still reach the Nitro
+  handler.
+- The AI spend cap is still a provider/account setting: Google quota/budget for
+  an own `GEMINI_API_KEY`, or Netlify AI credit controls for AI Gateway.

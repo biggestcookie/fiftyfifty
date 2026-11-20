@@ -55,6 +55,15 @@ export default defineNuxtConfig({
     },
   },
   routeRules: {
+    // API responses are capability URLs and receipt data. Never cache them,
+    // never index them, and never leak a referrer to another origin.
+    "/api/**": {
+      headers: {
+        "cache-control": "no-store",
+        "x-robots-tag": "noindex, nofollow",
+        "referrer-policy": "no-referrer",
+      },
+    },
     // Long-lived cache for the OCR model assets. Non-PWA users without a
     // registered service worker rely on the browser's HTTP cache; pinning
     // `max-age=31536000, immutable` means the ~164 MB of tars and ORT
@@ -171,7 +180,7 @@ export default defineNuxtConfig({
       name: "FiftyFifty",
       short_name: "FiftyFifty",
       description:
-        "Quickly split bills with friends. No accounts, no servers, fully private.",
+        "Quickly split bills with friends. No accounts, no tracking, and shared links expire.",
       theme_color: "#3faabe",
       background_color: "#ffffff",
       display: "standalone",
@@ -224,6 +233,12 @@ export default defineNuxtConfig({
       clientsClaim: true,
       skipWaiting: true,
       runtimeCaching: [
+        // Shared checks and OCR are capability/data requests. A cached API
+        // response would outlive link expiry, so always hit the network.
+        {
+          urlPattern: /\/api\/.*/i,
+          handler: "NetworkOnly",
+        },
         {
           urlPattern: ({ request }) => request.mode === "navigate",
           handler: "NetworkFirst",

@@ -69,14 +69,7 @@ export function useReceiptOcr() {
       else entry.reject(new Error(msg.reason ?? "ocr error"));
     };
     worker.onerror = (e: ErrorEvent) => {
-      console.error("[ocr] worker error event:", {
-        message: e.message,
-        filename: e.filename,
-        lineno: e.lineno,
-        colno: e.colno,
-        error: e.error,
-        preventDefault: typeof e.preventDefault === "function",
-      });
+      console.error("[ocr] worker error:", e.message);
       e.preventDefault?.();
       for (const [id, entry] of pending) {
         entry.reject(new Error(e.message || "worker error"));

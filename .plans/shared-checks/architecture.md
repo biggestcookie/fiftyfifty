@@ -111,6 +111,10 @@ X-Robots-Tag: noindex, nofollow
 Referrer-Policy: no-referrer
 ```
 
+The route handlers are thin HTTP wrappers. Status-code and validation logic
+lives in `shared/server/check-service.ts` so it can be tested with the
+in-memory Blobs store.
+
 Error body shape:
 
 ```json
@@ -518,9 +522,12 @@ are the fallback and the explicit privacy path.
 - **Never put the edit token in a URL, query string, analytics event, or log.**
 - Strip `share` from any client body before sending; reject unknown metadata
   server-side.
-- **Rate limits:**
-  - `POST /api/ocr`: strict per-IP limit (e.g. Netlify Firewall rule).
-  - `POST /api/checks`: creation limit.
+- **Rate limits:** code-based rate-limited redirects in `netlify.toml`
+  (Netlify supports rules for redirects/functions, not Nitro's generated
+  function). `/api/ocr` is strict; `/api/*` is broad. Free allows 2 rules.
+  - `POST /api/ocr`: strict per-IP limit (5/min).
+  - `POST /api/checks`: covered by the broad `/api/*` limit; add a tighter
+    rule on Pro if needed.
   - `GET`: broad limit; count 404s to deter enumeration.
 - **Body limits:** shared check ≤ 64 KB; OCR image ≤ 4 MB.
 - **Logging:** no request bodies, no OCR text, no check data. Remove the
