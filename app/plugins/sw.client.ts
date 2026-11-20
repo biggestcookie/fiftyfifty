@@ -1,30 +1,34 @@
 /**
- * Service worker registration.
+ * Service worker update checks.
  *
- * `@vite-pwa/nuxt` generates the SW and injects the manifest but does not
- * register the SW itself — that's the developer's job, and is normally
- * tied to the install-prompt UX.
- *
- * We want the SW to register on every visit so the precache fills even
- * for users who never accept the install prompt. That way the OCR model
- * is available offline and the browser HTTP cache stops being the only
- * safety net (see `.plans/receipt-ocr/architecture.md`, "Asset pipeline").
- *
- * The SW file lives at `/sw.js` because that's where `@vite-pwa/nuxt`
- * emits it. We register it once on first client mount; subsequent visits
- * no-op since the browser tracks the existing registration.
+ * `@vite-pwa/nuxt` already registers the worker itself (with `autoUpdate`,
+ * `skipWaiting` and `clientsClaim`), so this plugin must not register a second
+ * time. Registration only checks for a new deploy on page load, though, and
+ * users often keep the app open. Asking for an explicit update on load and
+ * whenever the tab becomes visible makes a fresh deploy land as soon as the
+ * worker installs and activates (the PWA module reloads the page then).
  */
 
 export default defineNuxtPlugin(() => {
   if (typeof navigator === "undefined") return;
   if (!("serviceWorker" in navigator)) return;
 
-  // Fire-and-forget: SW registration is best-effort. If it fails (e.g.
-  // insecure context, browser policy), the app keeps working — the user
-  // just falls back to the browser's HTTP cache for `/models/ocr/*`.
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch((err) => {
-      console.warn("[pwa] service worker registration failed:", err);
-    });
+  const checkForUpdate = () => {
+    // Fire-and-forget: update checks are best-effort. Offline users simply
+    // keep the current version.
+    navigator.serviceWorker
+      .getRegistration()
+      .then((registration) => registration?.update())
+      .catch(() => undefined);
+  };
+
+  window.addEventListener("load", checkForUpdate);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") checkForUpdate();
   });
+  // Also poll while the app stays open in the foreground, so a deploy does not
+  // wait for the next tab switch.
+  window.setInterval(() => {
+    if (document.visibilityState === "visible") checkForUpdate();
+  }, 15 * 60 * 1000);
 });

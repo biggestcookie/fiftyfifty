@@ -216,7 +216,11 @@ export default defineNuxtConfig({
     },
 
     workbox: {
-      navigateFallback: "200.html",
+      // @vite-pwa/nuxt rewrites HTML precache URLs before generating the SW
+      // (`index.html` → `/`, `200.html` → `200`). The fallback must point at
+      // a URL that is actually in that manifest, otherwise Workbox throws
+      // "non-precached-url" and the SPA navigation route never registers.
+      navigateFallback: "/",
       // Globbing Workbox's precache:
       // - `**/*.{js,mjs,css,html,png,svg,ico,woff,woff2,json,tar,wasm}`
       //   covers the app shell + the OCR model tars (~17 MB total) + the
